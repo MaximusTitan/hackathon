@@ -24,6 +24,9 @@ export const signUpAction = async (formData: FormData) => {
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
+      data: {
+        role: "user",
+      },
     },
   });
 
@@ -53,7 +56,7 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
-  return redirect("/protected");
+  return redirect("/"); // Redirect to home page after sign-in
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
