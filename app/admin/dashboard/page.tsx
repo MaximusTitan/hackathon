@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -12,12 +12,35 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type Event = {
   id: string;
   title: string;
-  date: string;
-  location: string;
+  start_date: string;
+  end_date: string;
+  start_time: string;
+  end_time: string;
+  event_type: "virtual" | "offline";
+  meeting_link?: string | null;
+  location?: string | null;
   image_url: string | null;
 };
 
@@ -26,14 +49,24 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     title: "",
-    date: "",
+    description: "",
+    start_date: "",
+    end_date: "",
+    start_time: "",
+    end_time: "",
+    event_type: "offline",
+    meeting_link: "",
     location: "",
+    location_link: "", // Add this new field
+    venue_name: "", // Add this new field
+    address_line1: "", // Add this new field
+    city: "", // Add this new field
+    postal_code: "", // Add this new field
     image_url: "",
   });
   const [creating, setCreating] = useState(false);
-  const [dateObj, setDateObj] = useState<Date | undefined>(
-    form.date ? new Date(form.date) : undefined
-  );
+  const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
+  const [endDateObj, setEndDateObj] = useState<Date | undefined>(undefined);
 
   useEffect(() => {
     async function fetchEvents() {
@@ -53,11 +86,29 @@ export default function AdminDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        date: dateObj ? dateObj.toISOString().slice(0, 10) : "",
+        start_date: startDateObj ? startDateObj.toISOString().slice(0, 10) : "",
+        end_date: endDateObj ? endDateObj.toISOString().slice(0, 10) : "",
       }),
     });
-    setForm({ title: "", date: "", location: "", image_url: "" });
-    setDateObj(undefined);
+    setForm({
+      title: "",
+      description: "",
+      start_date: "",
+      end_date: "",
+      start_time: "",
+      end_time: "",
+      event_type: "offline",
+      meeting_link: "",
+      location: "",
+      location_link: "", // Reset this new field
+      venue_name: "", // Reset this new field
+      address_line1: "", // Reset this new field
+      city: "", // Reset this new field
+      postal_code: "", // Reset this new field
+      image_url: "",
+    });
+    setStartDateObj(undefined);
+    setEndDateObj(undefined);
     setCreating(false);
   }
 
@@ -70,65 +121,306 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <form onSubmit={handleCreateEvent} className="bg-white rounded-lg shadow p-6 mb-8 flex flex-col gap-4 max-w-xl">
-        <h2 className="text-lg font-semibold mb-2">Create New Event</h2>
-        <input
-          className="border-2 border-gray-200 rounded-lg p-3 focus:border-rose-500 focus:ring focus:ring-rose-200 transition-all bg-white text-gray-900 placeholder:text-gray-500"
-          placeholder="Title"
-          value={form.title}
-          onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-          required
-        />
-        {/* Shadcn DatePicker */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={cn(
-                "w-full justify-start text-left font-normal border-2 border-gray-200 rounded-lg p-3 bg-white text-gray-900 placeholder:text-gray-500 focus:border-rose-500 focus:ring focus:ring-rose-200 transition-all",
-                !dateObj && "text-muted-foreground"
+      <Card className="mb-8 bg-white">
+        <CardHeader>
+          <CardTitle className="text-gray-800">Create New Event</CardTitle>
+          <CardDescription className="text-gray-600">
+            Fill out the form to create a new event
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleCreateEvent} className="space-y-6">
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="title" className="text-gray-700">
+                  Event Title
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="Enter event title"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  required
+                  className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Start Date */}
+                <div className="grid gap-2">
+                  <Label className="text-gray-700">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
+                          !startDateObj && "text-gray-500"
+                        )}
+                        type="button"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                        {startDateObj
+                          ? format(startDateObj, "PPP")
+                          : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDateObj}
+                        onSelect={(d) => {
+                          setStartDateObj(d);
+                          setForm((f) => ({
+                            ...f,
+                            start_date: d ? d.toISOString().slice(0, 10) : "",
+                          }));
+                        }}
+                        initialFocus
+                        className="bg-white text-gray-900"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {/* End Date */}
+                <div className="grid gap-2">
+                  <Label className="text-gray-700">End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
+                          !endDateObj && "text-gray-500"
+                        )}
+                        type="button"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                        {endDateObj
+                          ? format(endDateObj, "PPP")
+                          : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDateObj}
+                        onSelect={(d) => {
+                          setEndDateObj(d);
+                          setForm((f) => ({
+                            ...f,
+                            end_date: d ? d.toISOString().slice(0, 10) : "",
+                          }));
+                        }}
+                        initialFocus
+                        className="bg-white text-gray-900"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Start Time */}
+                <div className="grid gap-2">
+                  <Label htmlFor="start_time" className="text-gray-700">
+                    Start Time
+                  </Label>
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-500" />
+                    <Input
+                      id="start_time"
+                      type="time"
+                      value={form.start_time}
+                      onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
+                      required
+                      className="border-gray-200 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* End Time */}
+                <div className="grid gap-2">
+                  <Label htmlFor="end_time" className="text-gray-700">
+                    End Time
+                  </Label>
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-500" />
+                    <Input
+                      id="end_time"
+                      type="time"
+                      value={form.end_time}
+                      onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
+                      required
+                      className="border-gray-200 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Type */}
+              <div className="grid gap-2">
+                <Label htmlFor="event_type" className="text-gray-700">
+                  Event Type
+                </Label>
+                <Select
+                  value={form.event_type}
+                  onValueChange={(value) => setForm(f => ({ ...f, event_type: value as "virtual" | "offline" }))}
+                >
+                  <SelectTrigger className="bg-white border-gray-200 text-gray-900">
+                    <SelectValue placeholder="Select event type" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-gray-900">
+                    <SelectItem value="offline">Offline</SelectItem>
+                    <SelectItem value="virtual">Virtual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Conditional fields */}
+              {form.event_type === "virtual" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="meeting_link" className="text-gray-700">
+                    Meeting Link
+                  </Label>
+                  <Input
+                    id="meeting_link"
+                    placeholder="Enter meeting URL"
+                    value={form.meeting_link}
+                    onChange={(e) => setForm(f => ({ ...f, meeting_link: e.target.value }))}
+                    required
+                    className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="venue_name" className="text-gray-700">
+                      Venue Name
+                    </Label>
+                    <Input
+                      id="venue_name"
+                      placeholder="Enter venue name"
+                      value={form.venue_name}
+                      onChange={(e) => setForm(f => ({ ...f, venue_name: e.target.value }))}
+                      required
+                      className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="address_line1" className="text-gray-700">
+                      Address
+                    </Label>
+                    <Input
+                      id="address_line1"
+                      placeholder="Enter street address"
+                      value={form.address_line1}
+                      onChange={(e) => setForm(f => ({ ...f, address_line1: e.target.value }))}
+                      required
+                      className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="city" className="text-gray-700">
+                        City
+                      </Label>
+                      <Input
+                        id="city"
+                        placeholder="Enter city"
+                        value={form.city}
+                        onChange={(e) => setForm(f => ({ ...f, city: e.target.value }))}
+                        required
+                        className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                      />
+                    </div>
+                    
+                    <div className="grid gap-2">
+                      <Label htmlFor="postal_code" className="text-gray-700">
+                        Postal Code
+                      </Label>
+                      <Input
+                        id="postal_code"
+                        placeholder="Enter postal code"
+                        value={form.postal_code}
+                        onChange={(e) => setForm(f => ({ ...f, postal_code: e.target.value }))}
+                        className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="location" className="text-gray-700">
+                      Location Display Text
+                    </Label>
+                    <Input
+                      id="location"
+                      placeholder="How location should display to users"
+                      value={form.location}
+                      onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))}
+                      required
+                      className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="location_link" className="text-gray-700">
+                      Location Link (Google Maps URL)
+                    </Label>
+                    <Input
+                      id="location_link"
+                      placeholder="Enter Google Maps or location URL"
+                      value={form.location_link}
+                      onChange={(e) => setForm(f => ({ ...f, location_link: e.target.value }))}
+                      className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                    />
+                  </div>
+                </div>
               )}
-              type="button"
+
+              {/* Description Field */}
+              <div className="grid gap-2">
+                <Label htmlFor="description" className="text-gray-700">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Enter event description"
+                  value={form.description || ""}
+                  onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
+                  rows={4}
+                  className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                />
+              </div>
+
+              {/* Image URL */}
+              <div className="grid gap-2">
+                <Label htmlFor="image_url" className="text-gray-700">
+                  Image URL
+                </Label>
+                <Input
+                  id="image_url"
+                  placeholder="Enter image URL"
+                  value={form.image_url}
+                  onChange={(e) => setForm(f => ({ ...f, image_url: e.target.value }))}
+                  className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={creating}
+              className="bg-rose-600 hover:bg-rose-700 text-white w-full"
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {dateObj ? format(dateObj, "PPP") : <span>Pick a date</span>}
+              {creating ? "Creating..." : "Create Event"}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={dateObj}
-              onSelect={d => {
-                setDateObj(d);
-                setForm(f => ({
-                  ...f,
-                  date: d ? d.toISOString().slice(0, 10) : "",
-                }));
-              }}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
-        <input
-          className="border-2 border-gray-200 rounded-lg p-3 focus:border-rose-500 focus:ring focus:ring-rose-200 transition-all bg-white text-gray-900 placeholder:text-gray-500"
-          placeholder="Location"
-          value={form.location}
-          onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-        />
-        <input
-          className="border-2 border-gray-200 rounded-lg p-3 focus:border-rose-500 focus:ring focus:ring-rose-200 transition-all bg-white text-gray-900 placeholder:text-gray-500"
-          placeholder="Image URL"
-          value={form.image_url}
-          onChange={e => setForm(f => ({ ...f, image_url: e.target.value }))}
-        />
-        <button
-          type="submit"
-          className="bg-rose-600 text-white py-2 px-4 rounded hover:bg-rose-700"
-          disabled={creating}
-        >
-          {creating ? "Creating..." : "Create Event"}
-        </button>
-      </form>
+          </form>
+        </CardContent>
+      </Card>
 
       <h2 className="text-xl font-semibold mb-4">All Events</h2>
       {loading ? (
@@ -151,9 +443,19 @@ export default function AdminDashboard() {
               )}
               <div className="p-4">
                 <h3 className="font-semibold text-lg mb-1">{event.title}</h3>
-                <p className="text-gray-600 mb-2">{event.date}</p>
+                <p className="text-gray-600 mb-2">
+                  {event.start_date}
+                  {event.end_date && event.end_date !== event.start_date
+                    ? ` - ${event.end_date}`
+                    : ""}
+                </p>
+                <p className="text-gray-600 mb-2">
+                  {event.start_time} - {event.end_time}
+                </p>
                 <p className="text-gray-600 mb-4 text-sm">
-                  {event.location}
+                  {event.event_type === "virtual"
+                    ? event.meeting_link
+                    : event.location}
                 </p>
                 <Link
                   href={`/User/events/${event.id}`}
