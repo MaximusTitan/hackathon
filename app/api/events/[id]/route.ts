@@ -1,95 +1,78 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+// Update to use Promise<{ id: string }> for params
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  _: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("events")
-    .select("*")
-    .eq("id", params.id)
-    .single();
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  if (error || !data) {
-    return NextResponse.json({ event: null }, { status: 404 });
+    if (error || !data) {
+      return NextResponse.json({ event: null }, { status: 404 });
+    }
+    return NextResponse.json({ event: data });
+  } catch (error) {
+    console.error("Error fetching event:", error);
+    return NextResponse.json({ error: "Failed to fetch event" }, { status: 500 });
   }
-  return NextResponse.json({ event: data });
 }
 
-// Add PUT method to update an event
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const body = await req.json();
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("events")
+      .update({
+        ...body,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id);
 
-  // Extract all fields from the request body
-  const {
-    title,
-    description,
-    start_date,
-    end_date,
-    start_time,
-    end_time,
-    event_type,
-    meeting_link,
-    location,
-    location_link,
-    venue_name,
-    address_line1,
-    city,
-    postal_code,
-    image_url,
-  } = body;
+    if (error) {
+      console.error("Error updating event:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-  const { error } = await supabase
-    .from("events")
-    .update({
-      title,
-      description,
-      start_date,
-      end_date,
-      start_time,
-      end_time,
-      event_type,
-      meeting_link,
-      location,
-      location_link,
-      venue_name,
-      address_line1,
-      city,
-      postal_code,
-      image_url,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", params.id);
-
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error) {
     console.error("Error updating event:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }
 
-// Add DELETE method to remove an event
 export async function DELETE(
-  req: Request,
-  { params }: { params: { id: string } }
+  _: Request,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("events")
-    .delete()
-    .eq("id", params.id);
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("events")
+      .delete()
+      .eq("id", id);
 
-  if (error) {
+    if (error) {
+      console.error("Error deleting event:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ success: true });
+  } catch (error) {
     console.error("Error deleting event:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete event" }, { status: 500 });
   }
-
-  return NextResponse.json({ success: true });
 }
