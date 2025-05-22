@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarIcon, Clock, MapPin, ExternalLink, Video } from "lucide-react";
+import { useSession } from "@supabase/auth-helpers-react"; // or your session hook
 
 type Event = {
   id: string;
@@ -31,6 +32,11 @@ export default function EventDetailsPage() {
   const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
+  const session = useSession();
+  const userId = session?.user?.id;
+  const [registered, setRegistered] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchEvent() {
@@ -44,6 +50,43 @@ export default function EventDetailsPage() {
     }
     fetchEvent();
   }, [eventId]);
+
+  useEffect(() => {
+    // Check registration status
+    async function checkRegistration() {
+      if (!userId || !eventId) return;
+      const res = await fetch(`/api/registrations/user-event?user_id=${userId}&event_id=${eventId}`);
+      const data = await res.json();
+      setRegistered(data.registered);
+    }
+    checkRegistration();
+  }, [userId, eventId]);
+
+  async function handleRegister() {
+    try {
+      setRegistering(true);
+      const res = await fetch("/api/registrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_id: eventId }),
+      });
+
+      if (res.status === 401) {
+        router.push(`/sign-in?redirect=/User/events/${eventId}`);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error("Failed to register");
+      }
+
+      setRegistered(true);
+    } catch (error) {
+      console.error("Registration error:", error);
+    } finally {
+      setRegistering(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -204,8 +247,20 @@ export default function EventDetailsPage() {
           
           {/* Registration Button */}
           <div className="mt-8">
-            <button className="bg-rose-600 text-white py-3 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium">
-              Register for Event
+            <button
+              className={
+                registered
+                  ? "bg-green-600 text-white py-3 px-6 rounded-lg"
+                  : "bg-rose-600 text-white py-3 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium"
+              }
+              onClick={handleRegister}
+              disabled={registered || registering}
+            >
+              {registered
+                ? "Registered"
+                : registering
+                ? "Registering..."
+                : "Register for Event"}
             </button>
           </div>
           

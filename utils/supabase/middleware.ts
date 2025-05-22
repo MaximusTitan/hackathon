@@ -58,9 +58,9 @@ export const updateSession = async (request: NextRequest) => {
     }
     
     // User routes protection
-    if (request.nextUrl.pathname.startsWith("/User") && !user) {
-      return NextResponse.redirect(new URL("/sign-in", request.url));
-    }
+    // if (request.nextUrl.pathname.startsWith("/User") && !user) {
+    //   return NextResponse.redirect(new URL("/sign-in", request.url));
+    // }
 
     if (request.nextUrl.pathname === "/" && user) {
       // Redirect to admin dashboard if role is admin, null, or empty string
