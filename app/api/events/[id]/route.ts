@@ -34,6 +34,15 @@ export async function PUT(
     const body = await request.json();
     
     const supabase = await createClient();
+
+    // Check if user is admin
+    const { data: { session } } = await supabase.auth.getSession();
+    const isAdmin = session?.user?.user_metadata?.role === 'admin' || session?.user?.user_metadata?.role === null;
+
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { error } = await supabase
       .from("events")
       .update({
@@ -43,13 +52,11 @@ export async function PUT(
       .eq("id", id);
 
     if (error) {
-      console.error("Error updating event:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error updating event:", error);
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
   }
 }

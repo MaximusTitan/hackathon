@@ -52,15 +52,20 @@ export default function EventDetailsPage() {
   }, [eventId]);
 
   useEffect(() => {
-    // Check registration status
-    async function checkRegistration() {
-      if (!userId || !eventId) return;
-      const res = await fetch(`/api/registrations/user-event?user_id=${userId}&event_id=${eventId}`);
-      const data = await res.json();
-      setRegistered(data.registered);
+    async function checkRegistrationStatus() {
+      try {
+        const res = await fetch(`/api/registrations/check?event_id=${eventId}`);
+        const data = await res.json();
+        setRegistered(data.registered);
+      } catch (error) {
+        console.error('Error checking registration:', error);
+      }
     }
-    checkRegistration();
-  }, [userId, eventId]);
+
+    if (eventId) {
+      checkRegistrationStatus();
+    }
+  }, [eventId]);
 
   async function handleRegister() {
     try {
@@ -71,18 +76,13 @@ export default function EventDetailsPage() {
         body: JSON.stringify({ event_id: eventId }),
       });
 
-      if (res.status === 401) {
-        router.push(`/sign-in?redirect=/User/events/${eventId}`);
-        return;
+      if (res.ok) {
+        setRegistered(true);
+      } else {
+        console.error('Registration failed');
       }
-
-      if (!res.ok) {
-        throw new Error("Failed to register");
-      }
-
-      setRegistered(true);
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error('Error registering:', error);
     } finally {
       setRegistering(false);
     }
@@ -135,12 +135,15 @@ export default function EventDetailsPage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
       <div className="mb-6">
-        <Link href="/" className="text-rose-600 hover:underline text-sm flex items-center">
+        <button 
+          onClick={() => router.back()} 
+          className="text-rose-600 hover:underline text-sm flex items-center"
+        >
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
           </svg>
-          Back to Events
-        </Link>
+          Back
+        </button>
       </div>
       
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -248,11 +251,11 @@ export default function EventDetailsPage() {
           {/* Registration Button */}
           <div className="mt-8">
             <button
-              className={
+              className={`${
                 registered
-                  ? "bg-green-600 text-white py-3 px-6 rounded-lg"
-                  : "bg-rose-600 text-white py-3 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium"
-              }
+                  ? "bg-green-600"
+                  : "bg-rose-600 hover:bg-rose-700"
+              } text-white py-3 px-6 rounded-lg transition-colors font-medium`}
               onClick={handleRegister}
               disabled={registered || registering}
             >

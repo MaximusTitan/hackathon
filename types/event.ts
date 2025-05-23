@@ -1,0 +1,21 @@
+export type Event = {
+  id: string;
+  title: string;
+  description?: string | null;
+  start_date: string | null;
+  end_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  event_type: "virtual" | "offline" | null;
+  meeting_link?: string | null;
+  location?: string | null;
+  location_link?: string | null;
+  venue_name?: string | null;
+  address_line1?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+  image_url: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  is_public: boolean;
+};

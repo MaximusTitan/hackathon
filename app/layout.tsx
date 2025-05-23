@@ -2,6 +2,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import HeaderNav from "@/components/header-nav"; // Add this import
+import { Toaster } from "@/components/ui/sonner";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -37,6 +38,7 @@ export default function RootLayout({
           <main className="min-h-screen flex items-start justify-center">
             {children}
           </main>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

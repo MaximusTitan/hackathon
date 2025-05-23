@@ -1,12 +1,24 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  
+  // Check if user is admin
+  const { data: { session } } = await supabase.auth.getSession();
+  const isAdmin = session?.user?.user_metadata?.role === 'admin' || session?.user?.user_metadata?.role === null;
+
+  // If admin, get all events, if not, only get public events
+  const query = supabase
     .from("events")
     .select("*")
     .order("start_date", { ascending: true });
+
+  if (!isAdmin) {
+    query.eq('is_public', true);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ events: [] }, { status: 500 });
@@ -18,43 +30,10 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   const body = await req.json();
 
-  // Extract all fields from the request body
-  const {
-    title,
-    description,
-    start_date,
-    end_date,
-    start_time,
-    end_time,
-    event_type,
-    meeting_link,
-    location,
-    location_link,
-    venue_name,
-    address_line1,
-    city,
-    postal_code,
-    image_url,
-  } = body;
-
-  // Insert event with all fields
   const { error } = await supabase.from("events").insert([
     {
-      title,
-      description,
-      start_date,
-      end_date,
-      start_time,
-      end_time,
-      event_type,
-      meeting_link,
-      location,
-      location_link,
-      venue_name,
-      address_line1,
-      city,
-      postal_code,
-      image_url,
+      ...body,
+      is_public: body.is_public ?? true, // Add is_public field
     },
   ]);
 
