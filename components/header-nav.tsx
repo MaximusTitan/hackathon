@@ -40,6 +40,15 @@ export default function HeaderNav() {
     router.push("/sign-in");
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <header className="w-full bg-white/80 border-b border-gray-200 shadow-sm mb-2">
       <nav className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
@@ -47,11 +56,17 @@ export default function HeaderNav() {
           <Link href="/" className="font-bold text-lg text-rose-600">
             EventHub
           </Link>
-          <Link href="/" className="text-gray-700 hover:text-rose-600 font-medium">
+          <Link
+            href="/"
+            className="text-gray-700 hover:text-rose-600 font-medium"
+          >
             Events
           </Link>
           {user && role === "user" && (
-            <Link href="/User/dashboard" className="text-gray-700 hover:text-rose-600 font-medium">
+            <Link
+              href="/User/dashboard"
+              className="text-gray-700 hover:text-rose-600 font-medium"
+            >
               Registered Events
             </Link>
           )}
@@ -74,8 +89,15 @@ export default function HeaderNav() {
             </>
           ) : (
             <>
-              <Link href="/profile" className="flex items-center">
-                <UserCircle2 className="w-8 h-8 text-rose-600" />
+              <Link
+                href={
+                  user.user_metadata?.role === "admin"
+                    ? "/admin/profile"
+                    : "/User/profile"
+                }
+                className="bg-rose-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium hover:bg-rose-700 transition-colors"
+              >
+                {getInitials(user.user_metadata?.name || user.email)}
               </Link>
               <button
                 onClick={handleLogout}

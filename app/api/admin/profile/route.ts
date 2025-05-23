@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
@@ -39,35 +39,65 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  try {
-    const supabase = await createClient();
-    
-    // Get current user's session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const isAdmin = session.user.user_metadata?.role === 'admin';
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Fetch admin profile
-    const { data, error } = await supabase
-      .from('admin_profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ profile: data });
-  } catch (error) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+export async function GET() {
+  const supabase = await createClient();
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+
+  // Verify admin role
+  const isAdmin = session.user.user_metadata?.role === 'admin';
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const { data: profile, error } = await supabase
+    .from('admin_profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ profile });
+}
+
+export async function PUT(request: Request) {
+  const supabase = await createClient();
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // Verify admin role
+  const isAdmin = session.user.user_metadata?.role === 'admin';
+  if (!isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const updates = await request.json();
+  
+  const { error } = await supabase
+    .from('admin_profiles')
+    .update({
+      name: updates.name,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', session.user.id);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Update auth metadata
+  await supabase.auth.updateUser({
+    data: { name: updates.name }
+  });
+
+  return NextResponse.json({ success: true });
 }
