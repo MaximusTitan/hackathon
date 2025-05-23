@@ -547,12 +547,21 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <Link
-                  href={`/User/events/${event.id}`}
-                  className="bg-rose-600 text-white py-2 px-4 rounded-lg hover:bg-rose-700 transition-colors inline-block"
-                >
-                  View Details
-                </Link>
+                <div className="flex space-x-2">
+                  <Link
+                    href={`/User/events/${event.id}`}
+                    className="bg-rose-600 text-white py-2 px-4 rounded-lg hover:bg-rose-700 transition-colors inline-block"
+                  >
+                    View Details
+                  </Link>
+                  
+                  <Link
+                    href={`/admin/event-registrations/${event.id}`}
+                    className="bg-gray-100 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors inline-block"
+                  >
+                    View Registrations
+                  </Link>
+                </div>
               </div>
             </div>
           ))}

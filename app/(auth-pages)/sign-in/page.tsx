@@ -1,15 +1,32 @@
+"use client";
+
 import { signInAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
+import { FormMessage } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default async function Login(props: { searchParams: Promise<Message> }) {
-  const searchParams = await props.searchParams;
+// SignInForm component that uses useSearchParams hook
+function SignInForm() {
+  const searchParams = useSearchParams();
+  const message = searchParams.get("message");
+  const returnUrl = searchParams.get("returnUrl");
+
+  // Create a custom action that includes the returnUrl
+  const customSignInAction = async (formData: FormData) => {
+    // Append the returnUrl to the form data
+    if (returnUrl) {
+      formData.append("returnUrl", returnUrl);
+    }
+    return signInAction(formData);
+  };
+
   return (
     <div className="bg-white/50 rounded-xl shadow-md p-8 max-w-md w-full">
-      <form className="flex flex-col">
+      <form className="flex flex-col" action={customSignInAction}>
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Sign in</h1>
         <p className="text-sm text-gray-600 mb-6">
           Don't have an account?{" "}
@@ -58,16 +75,30 @@ export default async function Login(props: { searchParams: Promise<Message> }) {
           <div className="mt-2">
             <SubmitButton
               pendingText="Signing In..."
-              formAction={signInAction}
               className="bg-rose-600 hover:bg-rose-700 text-white py-2 px-4 rounded-lg w-full font-medium"
             >
               Sign in
             </SubmitButton>
           </div>
 
-          <FormMessage message={searchParams} />
+          {message && <FormMessage message={{ message }} />}
         </div>
       </form>
     </div>
+  );
+}
+
+// Main page component with Suspense
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="bg-white/50 rounded-xl shadow-md p-8 max-w-md w-full flex items-center justify-center">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }
