@@ -102,6 +102,7 @@ export default function EventRegistrationsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>So. No.</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>LinkedIn</TableHead>
@@ -112,8 +113,9 @@ export default function EventRegistrationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {registrations.map((reg) => (
+                  {registrations.map((reg, idx) => (
                     <TableRow key={reg.id}>
+                      <TableCell className="px-4 py-2 text-sm text-gray-700">{idx + 1}</TableCell>
                       <TableCell className="font-medium">{reg.user?.name || "N/A"}</TableCell>
                       <TableCell>{reg.user?.email || "N/A"}</TableCell>
                       <TableCell>

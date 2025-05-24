@@ -1,10 +1,11 @@
 "use client";
 
+import { signOutAction } from "@/app/actions";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Pencil, Save, X } from "lucide-react";
 
@@ -59,111 +60,125 @@ export default function UserProfile() {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-6">
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="pb-4 space-y-4">
-          <div className="flex items-center space-x-4">
-            <div className="h-20 w-20 rounded-full bg-rose-100 flex items-center justify-center">
-              <span className="text-2xl font-bold text-rose-600">
-                {profile?.name?.charAt(0)?.toUpperCase() || "U"}
-              </span>
+    <div className="w-full max-w-6xl mx-auto p-6">
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Profile</h1>
+        
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="pb-4 space-y-4">
+            <div className="flex items-center space-x-4">
+              <div className="h-20 w-20 rounded-full bg-rose-100 flex items-center justify-center">
+                <span className="text-2xl font-bold text-rose-600">
+                  {profile?.name?.charAt(0)?.toUpperCase() || "U"}
+                </span>
+              </div>
+              <div>
+                <CardTitle className="text-2xl">My Profile</CardTitle>
+                <p className="text-gray-500 mt-1">Manage your personal information</p>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-2xl">My Profile</CardTitle>
-              <p className="text-gray-500 mt-1">Manage your personal information</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-6">
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Name</Label>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid gap-6">
+                <div className="space-y-2">
+                  <Label className="text-gray-700 font-medium">Name</Label>
+                  {editing ? (
+                    <Input
+                      value={formData.name || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, name: e.target.value }))
+                      }
+                      className="border-gray-200 focus:border-rose-500"
+                    />
+                  ) : (
+                    <p className="text-gray-900 font-medium text-lg">{profile?.name}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-700 font-medium">Email</Label>
+                  <p className="text-gray-900">{profile?.email}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-700 font-medium">LinkedIn Profile</Label>
+                  {editing ? (
+                    <Input
+                      value={formData.linkedin || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, linkedin: e.target.value }))
+                      }
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      className="border-gray-200 focus:border-rose-500"
+                    />
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      {profile?.linkedin ? (
+                        <a
+                          href={profile.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-rose-600 hover:underline"
+                        >
+                          {profile.linkedin}
+                        </a>
+                      ) : (
+                        <p className="text-gray-500 italic">Not provided</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
                 {editing ? (
-                  <Input
-                    value={formData.name || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="border-gray-200 focus:border-rose-500"
-                  />
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditing(false);
+                        setFormData(profile || {});
+                      }}
+                      className="flex items-center"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      className="bg-rose-600 hover:bg-rose-700 flex items-center"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </Button>
+                  </>
                 ) : (
-                  <p className="text-gray-900 font-medium text-lg">{profile?.name}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Email</Label>
-                <p className="text-gray-900">{profile?.email}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">LinkedIn Profile</Label>
-                {editing ? (
-                  <Input
-                    value={formData.linkedin || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, linkedin: e.target.value }))
-                    }
-                    placeholder="https://linkedin.com/in/yourprofile"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    {profile?.linkedin ? (
-                      <a
-                        href={profile.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-rose-600 hover:underline"
-                      >
-                        {profile.linkedin}
-                      </a>
-                    ) : (
-                      <p className="text-gray-500 italic">Not provided</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              {editing ? (
-                <>
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setEditing(false);
-                      setFormData(profile || {});
-                    }}
-                    className="flex items-center"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
+                    onClick={() => setEditing(true)}
                     className="bg-rose-600 hover:bg-rose-700 flex items-center"
                   >
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Profile
                   </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={() => setEditing(true)}
-                  className="bg-rose-600 hover:bg-rose-700 flex items-center"
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Profile
-                </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="mt-8 pt-6 border-t">
+          <Button
+            onClick={() => signOutAction()}
+            variant="outline"
+            className="w-full bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 hover:text-rose-700"
+          >
+            Sign Out
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

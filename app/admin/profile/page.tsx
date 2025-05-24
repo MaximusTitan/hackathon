@@ -1,10 +1,11 @@
 "use client";
 
+import { signOutAction } from "@/app/actions";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Pencil, Save, X, ShieldCheck } from "lucide-react";
 
@@ -161,6 +162,16 @@ export default function AdminProfile() {
           </form>
         </CardContent>
       </Card>
+
+      <div className="mt-8 pt-6 border-t">
+        <Button
+          onClick={() => signOutAction()}
+          variant="outline"
+          className="w-full bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 hover:text-rose-700"
+        >
+          Sign Out
+        </Button>
+      </div>
     </div>
   );
 }

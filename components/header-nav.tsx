@@ -50,7 +50,7 @@ export default function HeaderNav() {
   };
 
   return (
-    <header className="w-full bg-white/80 border-b border-gray-200 shadow-sm mb-2">
+    <header className="w-full bg-white/80 border-b border-gray-200 shadow-sm mb-2 sticky top-0 z-50 backdrop-blur-sm">
       <nav className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
           <Link href="/" className="font-bold text-lg text-rose-600">
@@ -88,27 +88,18 @@ export default function HeaderNav() {
               </Link>
             </>
           ) : (
-            <>
-              <Link
-                href={
-                  user.user_metadata?.role === "admin"
-                    ? "/admin/profile"
-                    : "/User/profile"
-                }
-                className="bg-rose-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-medium hover:bg-rose-700 transition-colors"
-              >
+            <Link
+              href={
+                user.user_metadata?.role === "admin"
+                  ? "/admin/profile"
+                  : "/User/profile"
+              }
+              className="flex items-center gap-2 bg-rose-50 text-rose-600 py-1.5 px-3 rounded-full hover:bg-rose-100 transition-colors"
+            >
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white">
                 {getInitials(user.user_metadata?.name || user.email)}
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center justify-center p-2 rounded border border-rose-600 text-rose-600 hover:bg-rose-50"
-                title="Logout"
-                aria-label="Logout"
-                type="button"
-              >
-                <LogOut className="w-6 h-6" />
-              </button>
-            </>
+              </span>
+            </Link>
           )}
         </div>
       </nav>

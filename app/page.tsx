@@ -36,13 +36,19 @@ export default function Home() {
     async function fetchEvents() {
       const res = await fetch("/api/events");
       const data = await res.json();
-      // Sort events by created_at in descending order
-      const sortedEvents = (data.events || []).sort((a: Event, b: Event) => {
+      
+      // Filter out past events and sort by created_at
+      const currentDate = new Date();
+      const upcomingEvents = (data.events || []).filter((event: Event) => {
+        const eventDate = new Date(event.start_date || "");
+        return eventDate >= currentDate;
+      }).sort((a: Event, b: Event) => {
         const dateA = new Date(a.created_at || "");
         const dateB = new Date(b.created_at || "");
         return dateB.getTime() - dateA.getTime();
       });
-      setEvents(sortedEvents);
+      
+      setEvents(upcomingEvents);
       setLoading(false);
     }
     fetchEvents();
@@ -106,9 +112,6 @@ export default function Home() {
       </header>
 
       <section>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">All Events</h2>
-        </div>
         {loading ? (
           <div className="text-center text-gray-500 py-12">Loading events...</div>
         ) : events.length === 0 ? (
@@ -118,55 +121,77 @@ export default function Home() {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="w-full bg-white rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-shadow duration-300 group flex flex-col md:flex-row overflow-hidden relative"
+                className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02]"
               >
-                <div className="md:w-1/3 w-full h-64 md:h-auto relative flex-shrink-0 bg-gray-50 flex items-center justify-center">
+                <div className="md:w-2/5 w-full h-72 md:h-auto relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                   {event.image_url ? (
                     <img
                       src={event.image_url}
                       alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
                       onError={(e) => {
                         const img = e.currentTarget;
                         img.onerror = null;
-                        img.src = "/placeholder-event.png"; // Create this placeholder image
+                        img.src = "/placeholder-event.png";
                         img.className = "w-4/5 h-4/5 object-contain opacity-50";
                       }}
                     />
                   ) : (
-                    <span className="text-6xl font-bold text-gray-200">
+                    <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
                       {event.title.charAt(0)}
                     </span>
                   )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
-                <div className="flex-1 p-8 flex flex-col justify-between">
+                <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50">
                   <div>
-                    <div className="flex flex-wrap items-center gap-3 mb-2">
-                      <h3 className="font-bold text-2xl text-gray-900 truncate flex items-center gap-2">
+                    <div className="space-y-4">
+                      <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300">
                         {event.title}
                       </h3>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-6 text-gray-500 text-base mb-3">
-                      <span className="flex items-center gap-1"><CalendarIcon className="w-5 h-5" /> {event.start_date}{event.end_date && event.end_date !== event.start_date && (<span>- {event.end_date}</span>)}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-5 h-5" /> {event.start_time} - {event.end_time}</span>
-                    </div>
-                    <div className="text-gray-500 text-sm mb-4 truncate">
-                      {event.event_type === "virtual" 
-                        ? "Virtual Event" 
-                        : event.location}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-6 mt-2 mb-6">
-                      <span className="text-2xl font-bold text-rose-600">
-                        {event.is_paid ? `₹${event.price}` : 'Free'}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-4 text-gray-600">
+                        <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                          <CalendarIcon className="w-4 h-4 text-rose-500" />
+                          <span className="text-sm">
+                            {event.start_date}
+                            {event.end_date && event.end_date !== event.start_date && (
+                              <span> - {event.end_date}</span>
+                            )}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                          <Clock className="w-4 h-4 text-rose-500" />
+                          <span className="text-sm">
+                            {event.start_time} - {event.end_time}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <MapPin className="w-4 h-4 text-rose-500" />
+                        <span className="text-sm">
+                          {event.event_type === "virtual" ? "Virtual Event" : event.location}
+                        </span>
+                      </div>
+                      <div className="pt-2">
+                        <span className={`text-lg font-semibold ${
+                          event.is_paid 
+                            ? "text-green-600" 
+                            : "text-blue-600"
+                        }`}>
+                          {event.is_paid ? `₹${event.price}` : 'Free Entry'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-3 mt-4">
+                  <div className="mt-6 flex justify-end">
                     <Link
                       href={`/User/events/${event.id}`}
-                      className="bg-rose-600 text-white py-2 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow"
+                      className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
                     >
                       View Details
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
                     </Link>
                   </div>
                 </div>
