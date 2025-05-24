@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { CalendarIcon, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch"; // Add this import
 import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 type Event = {
   id: string;
@@ -78,6 +80,10 @@ export default function AdminDashboard() {
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
   const [endDateObj, setEndDateObj] = useState<Date | undefined>(undefined);
   const [showCreate, setShowCreate] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     async function fetchEvents() {
@@ -89,48 +95,92 @@ export default function AdminDashboard() {
     fetchEvents();
   }, [creating]);
 
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  }, []);
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('event-images')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('event-images')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
     
-    // Include payment fields in the API call
-    const eventData = {
-      ...form,
-      start_date: startDateObj ? startDateObj.toISOString().slice(0, 10) : "",
-      end_date: endDateObj ? endDateObj.toISOString().slice(0, 10) : "",
-      price: form.is_paid ? form.price : 0,
-      razorpay_key_id: form.is_paid ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "" : null, // Use env var, not user input
-    };
+    try {
+      let imageUrl = form.image_url;
+      
+      if (imageFile) {
+        setUploading(true);
+        imageUrl = await uploadImage(imageFile);
+        setUploading(false);
+      }
 
-    await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(eventData),
-    });
-    setForm({
-      title: "",
-      description: "",
-      start_date: "",
-      end_date: "",
-      start_time: "",
-      end_time: "",
-      event_type: "offline",
-      meeting_link: "",
-      location: "",
-      location_link: "", // Reset this new field
-      venue_name: "", // Reset this new field
-      address_line1: "", // Reset this new field
-      city: "", // Reset this new field
-      postal_code: "", // Reset this new field
-      image_url: "",
-      is_public: true,
-      is_paid: false,
-      price: 0,
-      razorpay_key_id: "",
-    });
-    setStartDateObj(undefined);
-    setEndDateObj(undefined);
-    setCreating(false);
+      const eventData = {
+        ...form,
+        image_url: imageUrl,
+        start_date: startDateObj ? startDateObj.toISOString().slice(0, 10) : "",
+        end_date: endDateObj ? endDateObj.toISOString().slice(0, 10) : "",
+        price: form.is_paid ? form.price : 0,
+        razorpay_key_id: form.is_paid ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "" : null, // Use env var, not user input
+      };
+
+      await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(eventData),
+      });
+      setForm({
+        title: "",
+        description: "",
+        start_date: "",
+        end_date: "",
+        start_time: "",
+        end_time: "",
+        event_type: "offline",
+        meeting_link: "",
+        location: "",
+        location_link: "", // Reset this new field
+        venue_name: "", // Reset this new field
+        address_line1: "", // Reset this new field
+        city: "", // Reset this new field
+        postal_code: "", // Reset this new field
+        image_url: "",
+        is_public: true,
+        is_paid: false,
+        price: 0,
+        razorpay_key_id: "",
+      });
+      setStartDateObj(undefined);
+      setEndDateObj(undefined);
+      setCreating(false);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      toast.error("Failed to create event");
+    } finally {
+      setCreating(false);
+      setUploading(false);
+    }
   }
 
   return (
@@ -424,18 +474,44 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                {/* Image URL */}
-                <div className="grid gap-2">
-                  <Label htmlFor="image_url" className="text-gray-700">
-                    Image URL
-                  </Label>
-                  <Input
-                    id="image_url"
-                    placeholder="Enter image URL"
-                    value={form.image_url}
-                    onChange={(e) => setForm(f => ({ ...f, image_url: e.target.value }))}
-                    className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
-                  />
+                {/* Image Upload Section */}
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="image" className="text-gray-700">
+                      Event Image
+                    </Label>
+                    <div className="space-y-2">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="border-gray-200"
+                      />
+                      {imagePreview && (
+                        <div className="mt-2">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full max-w-md rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="image_url" className="text-gray-700">
+                      Or Image URL
+                    </Label>
+                    <Input
+                      id="image_url"
+                      placeholder="Enter image URL"
+                      value={form.image_url}
+                      onChange={(e) => setForm(f => ({ ...f, image_url: e.target.value }))}
+                      className="border-gray-200"
+                    />
+                  </div>
                 </div>
 
                 {/* Add Public/Private Toggle */}
@@ -530,66 +606,62 @@ export default function AdminDashboard() {
       ) : events.length === 0 ? (
         <div className="text-center text-gray-500">No events found.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="w-full grid grid-cols-1 gap-8">
           {events.map((event) => (
-            <div
-              key={event.id}
-              className="bg-white rounded-lg shadow overflow-hidden"
-            >
-              {event.image_url && (
-                <img
-                  src={event.image_url}
-                  alt={event.title}
-                  className="w-full h-48 object-cover"
-                />
-              )}
-              <div className="p-4">
-                <h3 className="font-semibold text-lg mb-1">{event.title}</h3>
-                <p className="text-gray-600 mb-2">
-                  {event.start_date}
-                  {event.end_date && event.end_date !== event.start_date
-                    ? ` - ${event.end_date}`
-                    : ""}
-                </p>
-                <p className="text-gray-600 mb-2">
-                  {event.start_time} - {event.end_time}
-                </p>
-                <p className="text-gray-600 mb-4 text-sm">
-                  {event.event_type === "virtual"
-                    ? event.meeting_link
-                    : event.location}
-                </p>
-                <div className="text-xs text-gray-500 mb-2">
-                  {event.is_public ? (
-                    "Public Event"
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block px-2 py-1 rounded bg-rose-50 text-rose-700 font-semibold border border-rose-200">
-                        Private Event
-                      </span>
-                      <button
-                        type="button"
-                        title="Copy event link"
-                        onClick={() => {
-                          if (typeof window !== "undefined") {
-                            navigator.clipboard.writeText(
-                              `${window.location.origin}/User/events/${event.id}`
-                            );
-                            toast.success("Event link copied!");
-                          }
-                        }}
-                        className="ml-2 px-2 py-1 rounded bg-gray-100 border border-gray-300 text-rose-600 hover:bg-rose-50 text-xs font-medium transition"
-                      >
-                        Copy Link
-                      </button>
-                    </div>
-                  )}
+            <div key={event.id} className="w-full bg-white rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-shadow duration-300 group flex flex-col md:flex-row overflow-hidden relative">
+              <div className="md:w-1/3 w-full h-64 md:h-auto relative flex-shrink-0 bg-gray-50 flex items-center justify-center">
+                {event.image_url ? (
+                  <>
+                    <img
+                      src={event.image_url}
+                      alt={event.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.onerror = null;
+                        img.src = "/placeholder-event.png";
+                        img.className = "w-4/5 h-4/5 object-contain opacity-50";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                  </>
+                ) : (
+                  <span className="text-8xl font-bold text-gray-200 select-none">
+                    {event.title.charAt(0)}
+                  </span>
+                )}
+                <div className="absolute top-4 right-4 z-10">
+                  <span className={`px-4 py-1 rounded-full text-xs font-bold shadow-lg ${
+                    event.is_paid 
+                      ? "bg-green-600 text-white" 
+                      : "bg-blue-600 text-white"
+                  }`}>
+                    {event.is_paid ? `₹${event.price}` : 'Free'}
+                  </span>
                 </div>
-
-                {/* Add visibility toggle */}
-                <div className="flex items-center justify-between mt-3 mb-2">
-                  <span className="text-sm text-gray-600">Visibility:</span>
-                  <div className="flex items-center gap-2">
+              </div>
+              <div className="flex-1 p-8 flex flex-col justify-between">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <h3 className="font-bold text-2xl text-gray-900 truncate flex items-center gap-2">
+                      {event.title}
+                    </h3>
+                    {event.is_public ? (
+                      <span className="px-3 py-1 rounded bg-green-50 text-green-700 border border-green-200 text-xs font-semibold">Public</span>
+                    ) : (
+                      <span className="px-3 py-1 rounded bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">Private</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-6 text-gray-500 text-base mb-3">
+                    <span className="flex items-center gap-1"><CalendarIcon className="w-5 h-5" /> {event.start_date}{event.end_date && event.end_date !== event.start_date && (<span>- {event.end_date}</span>)}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-5 h-5" /> {event.start_time} - {event.end_time}</span>
+                  </div>
+                  <div className="text-gray-500 text-sm mb-4 truncate">
+                    {event.event_type === "virtual" 
+                      ? "Virtual Event" 
+                      : event.location}
+                  </div>
+                  <div className="flex items-center gap-3 mb-4">
                     <Switch
                       checked={event.is_public}
                       onCheckedChange={async (checked) => {
@@ -599,44 +671,49 @@ export default function AdminDashboard() {
                           body: JSON.stringify({ is_public: checked })
                         });
                         if (res.ok) {
-                          // Refresh events list
                           window.location.reload();
                         }
                       }}
                     />
-                    <span className="text-sm text-gray-600">
-                      {event.is_public ? 'Public' : 'Private'}
+                    <span className="text-xs text-gray-600">{event.is_public ? 'Public' : 'Private'}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-6 mt-2 mb-6">
+                    <span className="text-2xl font-bold text-rose-600">
+                      {event.is_paid ? `₹${event.price}` : 'Free'}
                     </span>
                   </div>
                 </div>
-
-                {/* Add price display */}
-                <div className="mb-2">
-                  {event.is_paid ? (
-                    <span className="inline-block px-2 py-1 rounded bg-green-50 text-green-700 font-semibold border border-green-200 text-sm">
-                      ₹{event.price}
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-1 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200 text-sm">
-                      Free
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-3 mt-4">
                   <Link
                     href={`/User/events/${event.id}`}
-                    className="bg-rose-600 text-white py-2 px-4 rounded-lg hover:bg-rose-700 transition-colors inline-block"
+                    className="bg-rose-600 text-white py-2 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow"
                   >
                     View Details
                   </Link>
-                  
                   <Link
                     href={`/admin/event-registrations/${event.id}`}
-                    className="bg-gray-100 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors inline-block"
+                    className="bg-gray-100 border border-gray-300 text-gray-700 py-2 px-6 rounded-lg hover:bg-gray-200 transition-colors text-base font-medium shadow"
                   >
-                    View Registrations
+                    Registrations
                   </Link>
+                  <button
+                    className="bg-red-600 text-white py-2 px-6 rounded-lg hover:bg-red-700 transition-colors text-base font-medium shadow"
+                    onClick={async () => {
+                      if (window.confirm(`Are you sure you want to delete the event '${event.title}'? This action cannot be undone.`)) {
+                        const res = await fetch(`/api/events/${event.id}`, {
+                          method: 'DELETE',
+                        });
+                        if (res.ok) {
+                          toast.success('Event deleted successfully');
+                          setEvents(events.filter(e => e.id !== event.id));
+                        } else {
+                          toast.error('Failed to delete event');
+                        }
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>

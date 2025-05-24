@@ -23,6 +23,9 @@ type Event = {
   image_url: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  is_paid: boolean;
+  price: number;
+  is_public: boolean;
 };
 
 export default function Home() {
@@ -33,7 +36,13 @@ export default function Home() {
     async function fetchEvents() {
       const res = await fetch("/api/events");
       const data = await res.json();
-      setEvents(data.events || []);
+      // Sort events by created_at in descending order
+      const sortedEvents = (data.events || []).sort((a: Event, b: Event) => {
+        const dateA = new Date(a.created_at || "");
+        const dateB = new Date(b.created_at || "");
+        return dateB.getTime() - dateA.getTime();
+      });
+      setEvents(sortedEvents);
       setLoading(false);
     }
     fetchEvents();
@@ -105,67 +114,61 @@ export default function Home() {
         ) : events.length === 0 ? (
           <div className="text-center text-gray-500 py-12">No events found.</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="w-full grid grid-cols-1 gap-8">
             {events.map((event) => (
               <div
                 key={event.id}
-                className="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow"
+                className="w-full bg-white rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-shadow duration-300 group flex flex-col md:flex-row overflow-hidden relative"
               >
-                {event.image_url ? (
-                  <img
-                    src={event.image_url}
-                    alt={event.title}
-                    className="w-full h-48 object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-400">No image available</span>
-                  </div>
-                )}
-                <div className="p-5">
-                  <h3 className="font-semibold text-lg mb-2 text-gray-800">
-                    {event.title}
-                  </h3>
-
-                  <div className="space-y-2 mb-4">
-                    {/* Date information */}
-                    <div className="flex items-center text-gray-600">
-                      <CalendarIcon className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span>
-                        {formatDateRange(event.start_date ?? null, event.end_date ?? null)}
+                <div className="md:w-1/3 w-full h-64 md:h-auto relative flex-shrink-0 bg-gray-50 flex items-center justify-center">
+                  {event.image_url ? (
+                    <img
+                      src={event.image_url}
+                      alt={event.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.onerror = null;
+                        img.src = "/placeholder-event.png"; // Create this placeholder image
+                        img.className = "w-4/5 h-4/5 object-contain opacity-50";
+                      }}
+                    />
+                  ) : (
+                    <span className="text-6xl font-bold text-gray-200">
+                      {event.title.charAt(0)}
+                    </span>
+                  )}
+                </div>
+                <div className="flex-1 p-8 flex flex-col justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                      <h3 className="font-bold text-2xl text-gray-900 truncate flex items-center gap-2">
+                        {event.title}
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-6 text-gray-500 text-base mb-3">
+                      <span className="flex items-center gap-1"><CalendarIcon className="w-5 h-5" /> {event.start_date}{event.end_date && event.end_date !== event.start_date && (<span>- {event.end_date}</span>)}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-5 h-5" /> {event.start_time} - {event.end_time}</span>
+                    </div>
+                    <div className="text-gray-500 text-sm mb-4 truncate">
+                      {event.event_type === "virtual" 
+                        ? "Virtual Event" 
+                        : event.location}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-6 mt-2 mb-6">
+                      <span className="text-2xl font-bold text-rose-600">
+                        {event.is_paid ? `₹${event.price}` : 'Free'}
                       </span>
                     </div>
-
-                    {/* Time information if available */}
-                    {(event.start_time || event.end_time) && (
-                      <div className="flex items-center text-gray-600">
-                        <Clock className="h-4 w-4 mr-2 flex-shrink-0" />
-                        <span>
-                          {formatTimeRange(event.start_time ?? null, event.end_time ?? null)}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Location information */}
-                    <div className="flex items-center text-gray-600">
-                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
-                      <span>{getLocationDisplay(event)}</span>
-                    </div>
                   </div>
-
-                  {/* Description preview if available */}
-                  {event.description && (
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                      {event.description}
-                    </p>
-                  )}
-
-                  <Link
-                    href={`/User/events/${event.id}`}
-                    className="bg-rose-600 text-white py-2 px-4 rounded-lg hover:bg-rose-700 transition-colors inline-block text-sm font-medium"
-                  >
-                    View Details
-                  </Link>
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <Link
+                      href={`/User/events/${event.id}`}
+                      className="bg-rose-600 text-white py-2 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow"
+                    >
+                      View Details
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}

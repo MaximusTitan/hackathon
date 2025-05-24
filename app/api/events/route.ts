@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const query = supabase
     .from("events")
     .select("*")
-    .order("start_date", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (!isAdmin) {
     query.eq('is_public', true);

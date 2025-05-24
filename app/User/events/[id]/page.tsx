@@ -456,15 +456,6 @@ export default function EventDetailsPage() {
               </button>
             )}
           </div>
-
-          {event.created_at && (
-            <div className="mt-8 text-xs text-gray-500">
-              Event created: {new Date(event.created_at).toLocaleString()}
-              {event.updated_at && event.updated_at !== event.created_at && (
-                <span> | Last updated: {new Date(event.updated_at).toLocaleString()}</span>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

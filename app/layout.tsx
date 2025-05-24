@@ -1,7 +1,6 @@
 import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
 import "./globals.css";
-import HeaderNav from "@/components/header-nav"; // Add this import
+import HeaderNav from "@/components/header-nav";
 import { Toaster } from "@/components/ui/sonner";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -25,21 +24,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={geistSans.className} suppressHydrationWarning>
+    <html lang="en" className={`${geistSans.className} light`}>
       <body style={{ backgroundColor: "#F7F1EF", color: "#333" }}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {/* Header Navigation */}
-          <HeaderNav />
-          <main className="min-h-screen flex items-start justify-center">
-            {children}
-          </main>
-          <Toaster />
-        </ThemeProvider>
+        <HeaderNav />
+        <main className="min-h-screen flex items-start justify-center">
+          {children}
+        </main>
+        <Toaster />
       </body>
     </html>
   );
