@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Get registrations with user details from our updated schema
+    // Get registrations with user details and payment details from our updated schema
     const { data, error } = await supabase
       .from('registrations')
       .select(`
@@ -38,7 +38,10 @@ export async function GET(request: Request) {
         event_id,
         user_name,
         user_email,
-        user_linkedin
+        user_linkedin,
+        payment_id,
+        order_id,
+        amount_paid
       `)
       .eq('event_id', event_id);
 
@@ -54,6 +57,9 @@ export async function GET(request: Request) {
       id: reg.id,
       registered_at: reg.registered_at,
       user_id: reg.user_id,
+      payment_id: reg.payment_id,
+      order_id: reg.order_id,
+      amount_paid: reg.amount_paid,
       user: {
         name: reg.user_name || 'Unknown',
         email: reg.user_email || 'Unknown',

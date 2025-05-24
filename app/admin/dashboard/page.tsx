@@ -45,6 +45,9 @@ type Event = {
   location?: string | null;
   image_url: string | null;
   is_public: boolean;
+  is_paid: boolean;
+  price: number;
+  razorpay_key_id?: string;
 };
 
 export default function AdminDashboard() {
@@ -67,6 +70,9 @@ export default function AdminDashboard() {
     postal_code: "", // Add this new field
     image_url: "",
     is_public: true,
+    is_paid: false,
+    price: 0,
+    razorpay_key_id: "",
   });
   const [creating, setCreating] = useState(false);
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -86,14 +92,20 @@ export default function AdminDashboard() {
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
+    
+    // Include payment fields in the API call
+    const eventData = {
+      ...form,
+      start_date: startDateObj ? startDateObj.toISOString().slice(0, 10) : "",
+      end_date: endDateObj ? endDateObj.toISOString().slice(0, 10) : "",
+      price: form.is_paid ? form.price : 0,
+      razorpay_key_id: form.is_paid ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "" : null, // Use env var, not user input
+    };
+
     await fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        start_date: startDateObj ? startDateObj.toISOString().slice(0, 10) : "",
-        end_date: endDateObj ? endDateObj.toISOString().slice(0, 10) : "",
-      }),
+      body: JSON.stringify(eventData),
     });
     setForm({
       title: "",
@@ -112,6 +124,9 @@ export default function AdminDashboard() {
       postal_code: "", // Reset this new field
       image_url: "",
       is_public: true,
+      is_paid: false,
+      price: 0,
+      razorpay_key_id: "",
     });
     setStartDateObj(undefined);
     setEndDateObj(undefined);
@@ -442,10 +457,58 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="text-sm text-gray-500">
-                  {form.is_public 
-                    ? "This event will be visible to everyone on the events page"
-                    : "This event will only be accessible via direct link"}
+                {/* Payment Settings Section */}
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Payment Settings
+                  </h3>
+                  <div className="flex items-center justify-between space-x-2">
+                    <Label htmlFor="is-paid" className="text-gray-700">
+                      Event Type
+                    </Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="is-paid"
+                        checked={form.is_paid}
+                        onCheckedChange={(checked) => 
+                          setForm(f => ({ ...f, is_paid: checked }))
+                        }
+                      />
+                      <span className="text-sm text-gray-600">
+                        {form.is_paid ? "Paid Event" : "Free Event"}
+                      </span>
+                    </div>
+                  </div>
+                  {form.is_paid && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="price" className="text-gray-700">
+                          Registration Fee (₹)
+                        </Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">₹</span>
+                          <Input
+                            id="price"
+                            type="number"
+                            min="1"
+                            value={form.price}
+                            onChange={(e) => setForm(f => ({ 
+                              ...f, 
+                              price: parseInt(e.target.value) || 0 
+                            }))}
+                            className="pl-8 border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                            placeholder="Enter amount"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-500">
+                    {form.is_paid 
+                      ? "Users will need to pay the registration fee to attend this event"
+                      : "This event is free for all users to attend"}
+                  </div>
                 </div>
               </div>
 
@@ -545,6 +608,19 @@ export default function AdminDashboard() {
                       {event.is_public ? 'Public' : 'Private'}
                     </span>
                   </div>
+                </div>
+
+                {/* Add price display */}
+                <div className="mb-2">
+                  {event.is_paid ? (
+                    <span className="inline-block px-2 py-1 rounded bg-green-50 text-green-700 font-semibold border border-green-200 text-sm">
+                      ₹{event.price}
+                    </span>
+                  ) : (
+                    <span className="inline-block px-2 py-1 rounded bg-blue-50 text-blue-700 font-semibold border border-blue-200 text-sm">
+                      Free
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex space-x-2">

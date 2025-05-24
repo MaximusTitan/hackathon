@@ -6,63 +6,61 @@ export async function POST(request: Request) {
     const { event_id } = await request.json();
     
     if (!event_id) {
-      return NextResponse.json({ error: "Missing event_id" }, { status: 400 });
+      return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
     }
 
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
+    // Use getUser instead of getSession for secure authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!session) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (authError || !user) {
+      return NextResponse.json({ error: "User authentication failed" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     
     // Check if already registered
-    const { data: existing } = await supabase
+    const { data: existingReg, error: checkError } = await supabase
       .from('registrations')
       .select('id')
       .eq('user_id', userId)
       .eq('event_id', event_id)
-      .maybeSingle();
+      .single();
       
-    if (existing) {
-      return NextResponse.json({ 
-        success: true, 
-        message: "Already registered" 
-      });
+    if (existingReg) {
+      return NextResponse.json({ message: "Already registered" });
     }
 
-    // Get user information
+    // Get user profile data
     const { data: userProfile } = await supabase
       .from('user_profiles')
       .select('name, email, linkedin')
       .eq('id', userId)
-      .maybeSingle();
+      .single();
     
-    // Fall back to auth user data if no profile exists
-    const name = userProfile?.name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Unknown';
-    const email = userProfile?.email || session.user.email;
-    const linkedin = userProfile?.linkedin || session.user.user_metadata?.linkedin || null;
-    
-    // Insert registration
-    const { error } = await supabase
+    // Prepare user data for registration
+    const userData = {
+      name: userProfile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
+      email: userProfile?.email || user.email,
+      linkedin: userProfile?.linkedin || user.user_metadata?.linkedin || null
+    };
+
+    // Create registration record
+    const { error: regError } = await supabase
       .from('registrations')
       .insert([
         { 
           user_id: userId, 
           event_id, 
-          user_name: name,
-          user_email: email,
-          user_linkedin: linkedin
+          user_name: userData.name,
+          user_email: userData.email,
+          user_linkedin: userData.linkedin
         }
       ]);
-    
-    if (error) {
-      console.error("Registration error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+
+    if (regError) {
+      return NextResponse.json({ error: regError.message }, { status: 500 });
     }
     
     return NextResponse.json({ success: true });

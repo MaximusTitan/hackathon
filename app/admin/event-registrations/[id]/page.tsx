@@ -17,6 +17,9 @@ type EventRegistration = {
   id: string;
   registered_at: string;
   user_id: string;
+  payment_id?: string | null;
+  order_id?: string | null;
+  amount_paid?: number | null;
   user: {
     name: string;
     email: string;
@@ -103,6 +106,9 @@ export default function EventRegistrationsPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>LinkedIn</TableHead>
                     <TableHead>Registered On</TableHead>
+                    <TableHead>Payment ID</TableHead>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Amount Paid</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -125,6 +131,9 @@ export default function EventRegistrationsPage() {
                         )}
                       </TableCell>
                       <TableCell>{formatDate(reg.registered_at)}</TableCell>
+                      <TableCell>{reg.payment_id || "-"}</TableCell>
+                      <TableCell>{reg.order_id || "-"}</TableCell>
+                      <TableCell>{reg.amount_paid ? `₹${reg.amount_paid}` : "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

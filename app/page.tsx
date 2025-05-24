@@ -91,7 +91,7 @@ export default function Home() {
     <div className="w-full max-w-6xl mx-auto p-6">
       <header className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Welcome to EventHub
+          Welcome to Hackon
         </h1>
         <p className="text-gray-600 text-lg">Discover and join amazing events.</p>
       </header>

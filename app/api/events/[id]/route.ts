@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-// Update to use Promise<{ id: string }> for params
 export async function GET(
   _: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -35,12 +34,17 @@ export async function PUT(
     
     const supabase = await createClient();
 
-    // Check if user is admin
-    const { data: { session } } = await supabase.auth.getSession();
-    const isAdmin = session?.user?.user_metadata?.role === 'admin' || session?.user?.user_metadata?.role === null;
-
-    if (!isAdmin) {
+    // Check if user is admin using getUser instead of getSession
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
+    
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const { error } = await supabase
@@ -68,6 +72,20 @@ export async function DELETE(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    
+    // Check if user is admin
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
+    
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+    
     const { error } = await supabase
       .from("events")
       .delete()

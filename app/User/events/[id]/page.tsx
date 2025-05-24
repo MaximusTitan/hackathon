@@ -26,7 +26,15 @@ type Event = {
   image_url: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  is_paid?: boolean;
+  price?: number;
 };
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function EventDetailsPage() {
   const params = useParams();
@@ -91,6 +99,21 @@ export default function EventDetailsPage() {
         return;
       }
 
+      // Check if this is a paid event
+      if (event?.is_paid && event?.price && event.price > 0) {
+        await processPayment();
+      } else {
+        // Free event - direct registration
+        await processRegistration();
+      }
+    } catch (error) {
+      console.error("Error registering:", error);
+      toast.error("Error registering for event");
+    }
+  }
+
+  async function processRegistration() {
+    try {
       setRegistering(true);
       const res = await fetch("/api/registrations", {
         method: "POST",
@@ -109,6 +132,127 @@ export default function EventDetailsPage() {
     } catch (error) {
       console.error("Error registering:", error);
       toast.error("Error registering for event");
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  async function processPayment() {
+    if (!event?.is_paid || !event.price) {
+      toast.error("Payment configuration error");
+      return;
+    }
+
+    try {
+      setRegistering(true);
+
+      // Create payment order
+      const orderRes = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          amount: event.price * 100, // Convert to paise
+        }),
+      });
+
+      if (!orderRes.ok) {
+        const errorData = await orderRes.json();
+        console.error("Order creation failed:", errorData);
+        toast.error(errorData.error || "Failed to create payment order");
+        setRegistering(false);
+        return;
+      }
+
+      const orderData = await orderRes.json();
+      
+      // Load Razorpay script dynamically
+      if (!window.Razorpay) {
+        await loadRazorpayScript();
+      }
+
+      // Create Razorpay options with verified order ID
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderData.amount.toString(),
+        currency: orderData.currency,
+        name: "Hackon",
+        description: `Registration for ${event.title}`,
+        order_id: orderData.id,
+        prefill: {
+          name: user?.user_metadata?.name || "",
+          email: user?.email || "",
+        },
+        notes: {
+          event_id: eventId,
+        },
+        theme: {
+          color: "#e11d48",
+        },
+        handler: async function (response: any) {
+          await verifyPayment(response);
+        },
+        modal: {
+          ondismiss: function() {
+            setRegistering(false);
+            toast.error("Payment cancelled");
+          }
+        }
+      };
+      
+      // Initialize payment
+      const razorpay = new window.Razorpay(options);
+      razorpay.on('payment.failed', function(response: any) {
+        console.error('Payment failed:', response.error);
+        toast.error(`Payment failed: ${response.error.description}`);
+        setRegistering(false);
+      });
+      
+      razorpay.open();
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast.error("Failed to process payment. Please try again.");
+      setRegistering(false);
+    }
+  }
+
+  async function loadRazorpayScript() {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+      
+      document.body.appendChild(script);
+    });
+  }
+
+  async function verifyPayment(paymentResponse: any) {
+    try {
+      // Verify payment on backend and complete registration
+      const verifyRes = await fetch("/api/payments/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: eventId,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_signature: paymentResponse.razorpay_signature,
+        }),
+      });
+
+      if (verifyRes.ok) {
+        setRegistered(true);
+        toast.success("Payment successful! You are registered for the event.");
+      } else {
+        const error = await verifyRes.json();
+        throw new Error(error.error || "Payment verification failed");
+      }
+    } catch (error) {
+      console.error("Payment verification error:", error);
+      toast.error("Payment verification failed. Please contact support.");
     } finally {
       setRegistering(false);
     }
@@ -189,7 +333,7 @@ export default function EventDetailsPage() {
         )}
 
         <div className="p-6 md:p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-4">{event.title}</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-4">{event.title} <span className="text-rose-600 font-bold">| Hackon</span></h1>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div className="space-y-4">
@@ -282,7 +426,7 @@ export default function EventDetailsPage() {
             {!user ? (
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                onClick={() => router.push(`/sign-in?returnUrl=/User/events/${eventId}`)}
+                onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${eventId}`)}`)}
               >
                 Sign in to Register
               </button>
@@ -295,13 +439,20 @@ export default function EventDetailsPage() {
               </button>
             ) : (
               <button
-                className={`bg-rose-600 hover:bg-rose-700 text-white py-3 px-6 rounded-lg transition-colors font-medium ${
+                className={`${
+                  event?.is_paid ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
+                } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
                   registering ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 onClick={handleRegister}
                 disabled={registering}
               >
-                {registering ? "Registering..." : "Register for Event"}
+                {registering 
+                  ? "Processing..." 
+                  : event?.is_paid && event?.price
+                    ? `Pay ₹${event.price} & Register`
+                    : "Register for Event"
+                }
               </button>
             )}
           </div>

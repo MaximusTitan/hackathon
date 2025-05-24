@@ -8,21 +8,21 @@ export async function GET(request: Request) {
 
     if (!event_id) {
       return NextResponse.json(
-        { registered: false, authenticated: false, error: "Missing event_id parameter" }, 
+        { error: "Missing event_id parameter", registered: false, authenticated: false }, 
         { status: 400 }
       );
     }
 
     const supabase = await createClient();
     
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
+    // Use getUser instead of getSession for secure authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (authError || !user) {
       return NextResponse.json({ registered: false, authenticated: false });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     
     // Check if user is registered for this event
     const { data, error } = await supabase
@@ -30,16 +30,7 @@ export async function GET(request: Request) {
       .select('id')
       .eq('user_id', userId)
       .eq('event_id', event_id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Error checking registration:", error);
-      return NextResponse.json({ 
-        error: error.message, 
-        registered: false, 
-        authenticated: true 
-      }, { status: 500 });
-    }
+      .single();
 
     return NextResponse.json({ 
       registered: !!data, 
