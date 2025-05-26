@@ -72,6 +72,21 @@ export default function EventDetailsPage() {
             const regData = await regRes.json();
             setRegistered(regData.registered);
           }
+
+          // --- Payment flow fix for post-sign-in ---
+          if (typeof window !== 'undefined') {
+            const paymentIntent = window.sessionStorage.getItem('register_payment_intent');
+            if (paymentIntent === eventId) {
+              window.sessionStorage.removeItem('register_payment_intent');
+              if (event?.is_paid && event?.price && !registered) {
+                // Wait for event to be set
+                setTimeout(() => {
+                  processPayment();
+                }, 100);
+              }
+            }
+          }
+          // --- End payment flow fix ---
         } else {
           setUser(null);
           setRegistered(false);
@@ -93,8 +108,14 @@ export default function EventDetailsPage() {
       const authRes = await fetch('/api/auth/check');
       const authData = await authRes.json();
 
+      const safeEventId = eventId || "";
+
       if (!authData.authenticated) {
-        const returnUrl = `/User/events/${eventId}`;
+        const returnUrl = `/User/events/${safeEventId}`;
+        // --- Store payment intent if paid event ---
+        if (event?.is_paid && event?.price && event.price > 0 && typeof window !== 'undefined') {
+          window.sessionStorage.setItem('register_payment_intent', safeEventId);
+        }
         router.push(`/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`);
         return;
       }

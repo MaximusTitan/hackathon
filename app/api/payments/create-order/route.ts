@@ -18,9 +18,7 @@ export async function POST(request: Request) {
     
     if (authError || !user) {
       return NextResponse.json({ error: "User authentication failed" }, { status: 401 });
-    }
-
-    // Get event details
+    }    // Get event details
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("*")
@@ -34,6 +32,19 @@ export async function POST(request: Request) {
     if (!event.is_paid) {
       return NextResponse.json({ error: "This is not a paid event" }, { status: 400 });
     }
+
+    // Get user profile data
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('name, email, linkedin')
+      .eq('id', user.id)
+      .single();
+
+    const userData = {
+      name: userProfile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown',
+      email: userProfile?.email || user.email,
+      linkedin: userProfile?.linkedin || user.user_metadata?.linkedin || null
+    };
 
     // Verify Razorpay credentials are available
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -51,15 +62,15 @@ export async function POST(request: Request) {
     // Hash and truncate to ensure <= 40 chars
     const receipt = crypto.createHash("sha256").update(rawReceipt).digest("hex").slice(0, 40);
     
-    try {
-      // Create a real Razorpay order using the API
+    try {      // Create a real Razorpay order using the API
       const order = await razorpay.orders.create({
         amount: amount,
         currency: "INR",
-        receipt: receipt,
-        notes: {
-          event_id: event_id,
-          user_id: user.id
+        receipt: receipt,        notes: {
+          app_name: "Hackon",
+          user_name: userData.name,
+          user_email: userData.email,
+          event_name: event.title || "Event Registration"
         }
       });
       
