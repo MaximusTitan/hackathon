@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarIcon, MapPin, Clock } from "lucide-react";
+import { CalendarIcon, MapPin, Clock, Users } from "lucide-react"; // Add Users icon
 
 type Event = {
   id: string;
@@ -26,6 +26,7 @@ type Event = {
   is_paid: boolean;
   price: number;
   is_public: boolean;
+  participant_count?: number; // Add participant count
 };
 
 export default function Home() {
@@ -34,22 +35,30 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchEvents() {
-      const res = await fetch("/api/events");
-      const data = await res.json();
-      
-      // Filter out past events and sort by created_at
-      const currentDate = new Date();
-      const upcomingEvents = (data.events || []).filter((event: Event) => {
-        const eventDate = new Date(event.start_date || "");
-        return eventDate >= currentDate;
-      }).sort((a: Event, b: Event) => {
-        const dateA = new Date(a.created_at || "");
-        const dateB = new Date(b.created_at || "");
-        return dateB.getTime() - dateA.getTime();
-      });
-      
-      setEvents(upcomingEvents);
-      setLoading(false);
+      try {
+        const res = await fetch("/api/events?with_participant_count=1");
+        let data: any = {};
+        try {
+          data = await res.json();
+        } catch (err) {
+          data = {};
+        }
+        // Filter out past events and sort by created_at
+        const currentDate = new Date();
+        const upcomingEvents = (data.events || []).filter((event: Event) => {
+          const eventDate = new Date(event.start_date || "");
+          return eventDate >= currentDate;
+        }).sort((a: Event, b: Event) => {
+          const dateA = new Date(a.created_at || "");
+          const dateB = new Date(b.created_at || "");
+          return dateB.getTime() - dateA.getTime();
+        });
+        setEvents(upcomingEvents);
+      } catch (error) {
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
     }
     fetchEvents();
   }, []);
@@ -165,11 +174,19 @@ export default function Home() {
                             {event.start_time} - {event.end_time}
                           </span>
                         </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <MapPin className="w-4 h-4 text-rose-500" />
-                        <span className="text-sm">
-                          {event.event_type === "virtual" ? "Virtual Event" : event.location}
+                        <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                          <MapPin className="w-4 h-4 text-rose-500" />
+                          <span className="text-sm">
+                            {event.event_type === "virtual" ? "Virtual Event" : event.location}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                          <Users className="w-4 h-4 text-rose-500" />
+                          <span className="text-sm">
+                            {typeof event.participant_count === "number"
+                              ? `${event.participant_count} participant${event.participant_count === 1 ? "" : "s"}`
+                              : "0 participants"}
+                          </span>
                         </span>
                       </div>
                       <div className="pt-2">

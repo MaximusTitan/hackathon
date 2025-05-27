@@ -3,7 +3,9 @@ import { createClient } from "@/utils/supabase/server";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
-  
+  const url = new URL(request.url);
+  const withCount = url.searchParams.get("with_participant_count");
+
   // Check if user is admin using getUser instead of getSession
   let isAdmin = false;
   try {
@@ -26,12 +28,38 @@ export async function GET(request: Request) {
     query.eq('is_public', true);
   }
 
-  const { data, error } = await query;
+  const { data: events, error } = await query;
 
   if (error) {
     return NextResponse.json({ events: [] }, { status: 500 });
   }
-  return NextResponse.json({ events: data });
+
+  if (withCount) {
+    // Fetch all registrations (only event_id)
+    const { data: registrations, error: regError } = await supabase
+      .from("registrations")
+      .select("event_id");
+
+    if (regError) {
+      return NextResponse.json({ error: regError.message }, { status: 500 });
+    }
+
+    // Count participants per event_id
+    const countMap: Record<string, number> = {};
+    (registrations || []).forEach((row: any) => {
+      countMap[row.event_id] = (countMap[row.event_id] || 0) + 1;
+    });
+
+    // Attach participant_count to each event
+    const eventsWithCount = (events || []).map((event: any) => ({
+      ...event,
+      participant_count: countMap[event.id] || 0,
+    }));
+
+    return NextResponse.json({ events: eventsWithCount });
+  }
+
+  return NextResponse.json({ events });
 }
 
 export async function POST(request: Request) {

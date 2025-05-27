@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { CalendarIcon, Clock, MapPin } from "lucide-react";
+import { CalendarIcon, Clock, MapPin, Clipboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -963,6 +963,22 @@ export default function AdminDashboard() {
                   >
                     Registrations
                   </Link>
+                  {/* Copy Link button for private events */}
+                  {!event.is_public && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="inline-flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-100"
+                      onClick={async () => {
+                        const url = `${window.location.origin}/User/events/${event.id}`;
+                        await navigator.clipboard.writeText(url);
+                        toast.success("Event link copied to clipboard!");
+                      }}
+                      title="Copy private event link"
+                    >
+                      <Clipboard className="w-4 h-4 mr-1" /> Copy Link
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

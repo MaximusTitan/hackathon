@@ -3,9 +3,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarIcon, Clock, MapPin, ExternalLink, Video } from "lucide-react";
+import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
+
+type Participant = {
+  id: string;
+  user_name: string | null;
+  user_email: string | null;
+  user_linkedin?: string | null;
+};
 
 type Event = {
   id: string;
@@ -45,6 +52,7 @@ export default function EventDetailsPage() {
   const [registered, setRegistered] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -90,6 +98,15 @@ export default function EventDetailsPage() {
         } else {
           setUser(null);
           setRegistered(false);
+        }
+
+        // Fetch participants for this event
+        if (eventId) {
+          const partRes = await fetch(`/api/events/${eventId}/participants`);
+          if (partRes.ok) {
+            const partData = await partRes.json();
+            setParticipants(partData.participants || []);
+          }
         }
       } catch (error) {
         console.error("Error initializing page:", error);
@@ -443,7 +460,7 @@ export default function EventDetailsPage() {
           )}
 
           {/* Registration Button */}
-          <div className="mt-8">
+          <div className="mt-8 mb-8">
             {!user ? (
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
@@ -475,6 +492,54 @@ export default function EventDetailsPage() {
                     : "Register for Event"
                 }
               </button>
+            )}
+          </div>
+
+          {/* Participants Table */}
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Users className="w-5 h-5 text-rose-600" />
+              Registered Participants
+              <span className="ml-2 text-base text-gray-500 font-normal">
+                ({participants.length})
+              </span>
+            </h2>
+            {participants.length === 0 ? (
+              <div className="text-gray-500">No participants registered yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Name</th>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Email</th>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">LinkedIn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participants.map((p) => (
+                      <tr key={p.id} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 text-gray-900">{p.user_name || "Unknown"}</td>
+                        <td className="px-4 py-2 text-gray-700">{p.user_email}</td>
+                        <td className="px-4 py-2">
+                          {p.user_linkedin ? (
+                            <a
+                              href={p.user_linkedin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline text-sm"
+                            >
+                              LinkedIn
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 text-sm">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
