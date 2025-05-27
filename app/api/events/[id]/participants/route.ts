@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+// Use the correct type for the context argument in Next.js API routes
+export async function GET(request: Request, context: any) {
   const supabase = await createClient();
-  const eventId = params.id;
+  const eventId = context.params.id;
 
   const { data: participants, error } = await supabase
     .from("registrations")
