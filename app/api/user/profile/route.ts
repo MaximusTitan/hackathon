@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('*')
+    .select('*, contact_number, github, education, years_of_experience, programming_languages, expertise')
     .eq('id', session.user.id)
     .single();
 
@@ -31,14 +31,26 @@ export async function PUT(request: Request) {
   }
 
   const updates = await request.json();
-  
+
+  // Ensure photo_url is included in the update if present in the request
+  const updateData: any = {
+    name: updates.name,
+    linkedin: updates.linkedin,
+    contact_number: updates.contact_number,
+    github: updates.github,
+    education: updates.education,
+    years_of_experience: updates.years_of_experience,
+    programming_languages: updates.programming_languages,
+    expertise: updates.expertise,
+    updated_at: new Date().toISOString(),
+  };
+  if (typeof updates.photo_url === "string" && updates.photo_url.length > 0) {
+    updateData.photo_url = updates.photo_url;
+  }
+
   const { error } = await supabase
     .from('user_profiles')
-    .update({
-      name: updates.name,
-      linkedin: updates.linkedin,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', session.user.id);
 
   if (error) {

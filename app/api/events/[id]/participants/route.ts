@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-// Use the correct type for the context argument in Next.js API routes
-export async function GET(request: Request, context: any) {
+export async function GET(request: Request, { params }: any) {
   const supabase = await createClient();
-  const eventId = context.params.id;
+  const eventId = params.id;
 
   const { data: participants, error } = await supabase
     .from("registrations")
-    .select("id, user_name, user_email, user_linkedin")
+    .select("id, user_name, user_email, user_linkedin, user_id")
     .eq("event_id", eventId)
     .order("registered_at", { ascending: true });
 
@@ -16,5 +15,28 @@ export async function GET(request: Request, context: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ participants });
+  // Fetch profile photos for all participants
+  const userIds = (participants || []).map((p: any) => p.user_id);
+  let photoMap: Record<string, string | null> = {};
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("user_profiles")
+      .select("id, photo_url")
+      .in("id", userIds);
+
+    if (profiles) {
+      photoMap = profiles.reduce((acc: Record<string, string | null>, curr: any) => {
+        acc[curr.id] = curr.photo_url || null;
+        return acc;
+      }, {});
+    }
+  }
+
+  // Attach photo_url to each participant
+  const participantsWithPhoto = (participants || []).map((p: any) => ({
+    ...p,
+    photo_url: photoMap[p.user_id] || null,
+  }));
+
+  return NextResponse.json({ participants: participantsWithPhoto });
 }

@@ -830,7 +830,7 @@ export default function AdminDashboard() {
       ) : (
         <div className="w-full grid grid-cols-1 gap-8">
           {events.map((event) => (
-            <div key={event.id} className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02]">
+            <div key={event.id} className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72">
               {/* Admin Actions - Add this new section */}
               <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
                 <Button
@@ -863,7 +863,7 @@ export default function AdminDashboard() {
                 </Button>
               </div>
 
-              <div className="md:w-2/5 w-full h-72 md:h-auto relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+              <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                 {event.image_url ? (
                   <img
                     src={event.image_url}
@@ -883,10 +883,10 @@ export default function AdminDashboard() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
               </div>
-              <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50">
-                <div>
+              <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
+                <div className="flex-1 overflow-hidden">
                   <div className="flex flex-wrap items-center gap-3 mb-4">
-                    <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300">
+                    <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
                       {event.title}
                     </h3>
                     {event.is_public ? (
@@ -899,7 +899,7 @@ export default function AdminDashboard() {
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
+                  <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-4">
                     <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                       <CalendarIcon className="w-4 h-4 text-rose-500" />
                       <span className="text-sm">
@@ -916,28 +916,10 @@ export default function AdminDashboard() {
                       </span>
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-gray-600 mb-4">
+                  <div className="flex items-center gap-2 text-gray-600 mb-2">
                     <MapPin className="w-4 h-4 text-rose-500" />
                     <span className="text-sm">
                       {event.event_type === "virtual" ? "Virtual Event" : event.location}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <Switch
-                      checked={event.is_public}
-                      onCheckedChange={async (checked) => {
-                        const res = await fetch(`/api/events/${event.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ is_public: checked })
-                        });
-                        if (res.ok) {
-                          window.location.reload();
-                        }
-                      }}
-                    />
-                    <span className="text-sm text-gray-600">
-                      {event.is_public ? 'Public' : 'Private'}
                     </span>
                   </div>
                   <div className="pt-2">
@@ -950,7 +932,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                   <Link
                     href={`/User/events/${event.id}`}
                     className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"

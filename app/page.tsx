@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarIcon, MapPin, Clock, Users } from "lucide-react"; // Add Users icon
+import { CalendarIcon, MapPin, Clock, Users } from "lucide-react";
+import { Facepile } from "@/components/ui/facepile";
+
+type Participant = {
+  id: string;
+  user_name: string | null;
+  photo_url?: string | null;
+};
 
 type Event = {
   id: string;
@@ -26,7 +33,8 @@ type Event = {
   is_paid: boolean;
   price: number;
   is_public: boolean;
-  participant_count?: number; // Add participant count
+  participant_count?: number;
+  participants?: Participant[];
 };
 
 export default function Home() {
@@ -43,17 +51,49 @@ export default function Home() {
         } catch (err) {
           data = {};
         }
+
         // Filter out past events and sort by created_at
         const currentDate = new Date();
-        const upcomingEvents = (data.events || []).filter((event: Event) => {
-          const eventDate = new Date(event.start_date || "");
-          return eventDate >= currentDate;
-        }).sort((a: Event, b: Event) => {
-          const dateA = new Date(a.created_at || "");
-          const dateB = new Date(b.created_at || "");
-          return dateB.getTime() - dateA.getTime();
-        });
-        setEvents(upcomingEvents);
+        const upcomingEvents = (data.events || [])
+          .filter((event: Event) => {
+            const eventDate = new Date(event.start_date || "");
+            return eventDate >= currentDate;
+          })
+          .sort((a: Event, b: Event) => {
+            const dateA = new Date(a.created_at || "");
+            const dateB = new Date(b.created_at || "");
+            return dateB.getTime() - dateA.getTime();
+          });
+
+        // Fetch participants for each event
+        interface ParticipantResponse {
+          participants: Participant[];
+        }
+
+        const eventsWithParticipants: Event[] = await Promise.all(
+          upcomingEvents.map(async (event: Event) => {
+            try {
+              const partRes: Response = await fetch(
+          `/api/events/${event.id}/participants`
+              );
+              if (partRes.ok) {
+          const partData: ParticipantResponse = await partRes.json();
+          return {
+            ...event,
+            participants: partData.participants || [],
+          };
+              }
+            } catch (error: unknown) {
+              console.error(
+          `Error fetching participants for event ${event.id}:`,
+          error
+              );
+            }
+            return { ...event, participants: [] };
+          })
+        );
+
+        setEvents(eventsWithParticipants);
       } catch (error) {
         setEvents([]);
       } finally {
@@ -130,9 +170,9 @@ export default function Home() {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02]"
+                className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72"
               >
-                <div className="md:w-2/5 w-full h-72 md:h-auto relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+                <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                   {event.image_url ? (
                     <img
                       src={event.image_url}
@@ -152,13 +192,13 @@ export default function Home() {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
                 </div>
-                <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50">
-                  <div>
+                <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
+                  <div className="flex-1 overflow-hidden">
                     <div className="space-y-4">
-                      <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300">
+                      <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
                         {event.title}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-4 text-gray-600">
+                      <div className="flex flex-wrap items-center gap-2 text-gray-600">
                         <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                           <CalendarIcon className="w-4 h-4 text-rose-500" />
                           <span className="text-sm">
@@ -180,15 +220,8 @@ export default function Home() {
                             {event.event_type === "virtual" ? "Virtual Event" : event.location}
                           </span>
                         </span>
-                        <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
-                          <Users className="w-4 h-4 text-rose-500" />
-                          <span className="text-sm">
-                            {typeof event.participant_count === "number"
-                              ? `${event.participant_count} participant${event.participant_count === 1 ? "" : "s"}`
-                              : "0 participants"}
-                          </span>
-                        </span>
                       </div>
+
                       <div className="pt-2">
                         <span className={`text-lg font-semibold ${
                           event.is_paid 
@@ -200,7 +233,16 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-4 flex justify-between items-end">
+                    {/* Add Facepile in bottom left */}
+                    <div className="flex-1">
+                      <Facepile
+                        participants={event.participants || []}
+                        maxVisible={4}
+                        size="sm"
+                        showCount={true}
+                      />
+                    </div>
                     <Link
                       href={`/User/events/${event.id}`}
                       className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"

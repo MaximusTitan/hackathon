@@ -12,6 +12,7 @@ type Participant = {
   user_name: string | null;
   user_email: string | null;
   user_linkedin?: string | null;
+  photo_url?: string | null; // Add photo_url
 };
 
 type Event = {
@@ -511,6 +512,7 @@ export default function EventDetailsPage() {
                 <table className="min-w-full border border-gray-200 rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Photo</th>
                       <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Name</th>
                       <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Email</th>
                       <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">LinkedIn</th>
@@ -519,6 +521,19 @@ export default function EventDetailsPage() {
                   <tbody>
                     {participants.map((p) => (
                       <tr key={p.id} className="border-b last:border-b-0">
+                        <td className="px-4 py-2">
+                          {p.photo_url ? (
+                            <img
+                              src={p.photo_url}
+                              alt={p.user_name || "Profile"}
+                              className="w-10 h-10 rounded-full object-cover border"
+                            />
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold">
+                              {p.user_name?.charAt(0).toUpperCase() || "U"}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-gray-900">{p.user_name || "Unknown"}</td>
                         <td className="px-4 py-2 text-gray-700">{p.user_email}</td>
                         <td className="px-4 py-2">
