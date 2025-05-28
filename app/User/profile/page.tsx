@@ -21,6 +21,7 @@ type Profile = {
   programming_languages?: string | null;
   expertise?: string | null;
   photo_url?: string | null;
+  role?: string | null;
   created_at: string;
 };
 
@@ -236,6 +237,30 @@ export default function UserProfile() {
                     ) : (
                       <p className="text-gray-900">
                         {profile?.contact_number || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Role Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Role/Position</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.role || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            role: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="e.g. Software Developer, Designer, Student"
+                      />
+                    ) : (
+                      <p className="text-gray-900">
+                        {profile?.role || (
                           <span className="text-gray-400 italic">Not provided</span>
                         )}
                       </p>

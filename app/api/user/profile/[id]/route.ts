@@ -16,7 +16,7 @@ export async function GET(
   // Fetch the profile data for the specified user
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('*')
+    .select('*, role')
     .eq('id', profileUserId)
     .single();
 

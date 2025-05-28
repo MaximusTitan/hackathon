@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data: profile, error } = await supabase
     .from('user_profiles')
-    .select('*, contact_number, github, education, years_of_experience, programming_languages, expertise')
+    .select('*, contact_number, github, education, years_of_experience, programming_languages, expertise, role')
     .eq('id', session.user.id)
     .single();
 
@@ -42,6 +42,7 @@ export async function PUT(request: Request) {
     years_of_experience: updates.years_of_experience,
     programming_languages: updates.programming_languages,
     expertise: updates.expertise,
+    role: updates.role,
     updated_at: new Date().toISOString(),
   };
   if (typeof updates.photo_url === "string" && updates.photo_url.length > 0) {

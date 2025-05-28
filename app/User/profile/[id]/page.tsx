@@ -25,6 +25,7 @@ type Profile = {
   programming_languages?: string | null;
   expertise?: string | null;
   photo_url?: string | null;
+  role?: string | null;
   created_at: string;
 };
 
@@ -136,6 +137,9 @@ export default function UserProfilePage() {
           <CardTitle className="text-2xl font-bold text-gray-900">
             {profile.name}
           </CardTitle>
+          {profile.role && (
+            <p className="text-rose-600 font-medium">{profile.role}</p>
+          )}
           <div className="flex items-center gap-2 text-gray-600">
             <Mail className="w-4 h-4" />
             <span>{profile.email}</span>
