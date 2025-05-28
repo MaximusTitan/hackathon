@@ -42,10 +42,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
   }
 
-  // Attach photo_url to each participant
+  // Attach photo_url and ensure user_id is included
   const participantsWithPhoto =
     participants?.map((p) => ({
-      ...p,
+      id: p.id,
+      user_id: p.user_id, // Ensure user_id is included
+      user_name: p.user_name,
+      user_email: p.user_email,
+      user_linkedin: p.user_linkedin,
       photo_url: photoMap[p.user_id] || null,
     })) || [];
 

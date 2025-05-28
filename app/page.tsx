@@ -4,9 +4,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarIcon, MapPin, Clock, Users } from "lucide-react";
 import { Facepile } from "@/components/ui/facepile";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Participant = {
   id: string;
+  user_id: string; // Add user_id field
   user_name: string | null;
   photo_url?: string | null;
 };
@@ -40,6 +49,8 @@ type Event = {
 export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedEventParticipants, setSelectedEventParticipants] = useState<Participant[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     async function fetchEvents() {
@@ -151,6 +162,11 @@ export default function Home() {
     return "Location TBD";
   };
 
+  const handleFacepileClick = (participants: Participant[]) => {
+    setSelectedEventParticipants(participants);
+    setDialogOpen(true);
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
       <header className="mb-8 text-center">
@@ -238,14 +254,74 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="mt-3 flex justify-between items-end">
-                    {/* Add Facepile in bottom left */}
+                    {/* Clickable Facepile */}
                     <div className="flex-1">
-                      <Facepile
-                        participants={event.participants || []}
-                        maxVisible={4}
-                        size="sm"
-                        showCount={true}
-                      />
+                      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                          <div 
+                            className="cursor-pointer"
+                            onClick={() => handleFacepileClick(event.participants || [])}
+                          >
+                            <Facepile
+                              participants={event.participants || []}
+                              maxVisible={4}
+                              size="sm"
+                              showCount={true}
+                            />
+                          </div>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                              <Users className="w-5 h-5 text-rose-500" />
+                              Registered Participants
+                              <span className="text-base text-gray-500 font-normal">
+                                ({selectedEventParticipants.length})
+                              </span>
+                            </DialogTitle>
+                          </DialogHeader>
+                          <ScrollArea className="max-h-96">
+                            <div className="space-y-3">
+                              {selectedEventParticipants.length === 0 ? (
+                                <p className="text-gray-500 text-center py-4">
+                                  No participants registered yet.
+                                </p>
+                              ) : (
+                                selectedEventParticipants.map((participant) => (
+                                  <Link
+                                    key={participant.id}
+                                    href={`/User/profile/${participant.user_id}`} // Use user_id instead of id
+                                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+                                    onClick={() => setDialogOpen(false)}
+                                  >
+                                    <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0">
+                                      {participant.photo_url ? (
+                                        <img
+                                          src={participant.photo_url}
+                                          alt={participant.user_name || "Profile"}
+                                          className="h-12 w-12 object-cover"
+                                        />
+                                      ) : (
+                                        <div className="h-12 w-12 bg-rose-100 flex items-center justify-center text-rose-600 font-semibold">
+                                          {participant.user_name?.charAt(0)?.toUpperCase() || "U"}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-gray-900 truncate">
+                                        {participant.user_name || "Unknown User"}
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        View Profile
+                                      </p>
+                                    </div>
+                                  </Link>
+                                ))
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     <Link
                       href={`/User/events/${event.id}`}
