@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
-export async function GET(request: Request, { params }: any) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
-  const eventId = params.id;
+  const { id: eventId } = await params;
 
   const { data: participants, error } = await supabase
     .from("registrations")
-    .select("id, user_name, user_email, user_linkedin, user_id")
+    .select(`
+      id,
+      user_id,
+      user_name,
+      user_email,
+      user_linkedin
+    `)
     .eq("event_id", eventId)
     .order("registered_at", { ascending: true });
 
@@ -16,8 +22,9 @@ export async function GET(request: Request, { params }: any) {
   }
 
   // Fetch profile photos for all participants
-  const userIds = (participants || []).map((p: any) => p.user_id);
+  const userIds = participants?.map((p) => p.user_id) || [];
   let photoMap: Record<string, string | null> = {};
+
   if (userIds.length > 0) {
     const { data: profiles } = await supabase
       .from("user_profiles")
@@ -25,18 +32,22 @@ export async function GET(request: Request, { params }: any) {
       .in("id", userIds);
 
     if (profiles) {
-      photoMap = profiles.reduce((acc: Record<string, string | null>, curr: any) => {
-        acc[curr.id] = curr.photo_url || null;
-        return acc;
-      }, {});
+      photoMap = profiles.reduce(
+        (acc: Record<string, string | null>, curr: any) => {
+          acc[curr.id] = curr.photo_url || null;
+          return acc;
+        },
+        {}
+      );
     }
   }
 
   // Attach photo_url to each participant
-  const participantsWithPhoto = (participants || []).map((p: any) => ({
-    ...p,
-    photo_url: photoMap[p.user_id] || null,
-  }));
+  const participantsWithPhoto =
+    participants?.map((p) => ({
+      ...p,
+      photo_url: photoMap[p.user_id] || null,
+    })) || [];
 
   return NextResponse.json({ participants: participantsWithPhoto });
 }

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 type Participant = {
   id: string;
+  user_id: string;
   user_name: string | null;
   user_email: string | null;
   user_linkedin?: string | null;
@@ -524,15 +525,25 @@ export default function EventDetailsPage() {
                       <tr key={p.id} className="border-b last:border-b-0">
                         <td className="px-4 py-2">
                           {p.photo_url ? (
-                            <img
-                              src={p.photo_url}
-                              alt={p.user_name || "Profile"}
-                              className="w-10 h-10 rounded-full object-cover border"
-                            />
+                            <Link
+                              href={`/User/profile/${p.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <img
+                                src={p.photo_url}
+                                alt={p.user_name || "Profile"}
+                                className="w-10 h-10 rounded-full object-cover border hover:border-rose-300"
+                              />
+                            </Link>
                           ) : (
-                            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold">
-                              {p.user_name?.charAt(0).toUpperCase() || "U"}
-                            </span>
+                            <Link
+                              href={`/User/profile/${p.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold hover:bg-gray-200">
+                                {p.user_name?.charAt(0).toUpperCase() || "U"}
+                              </span>
+                            </Link>
                           )}
                         </td>
                         <td className="px-4 py-2 text-gray-900">{p.user_name || "Unknown"}</td>

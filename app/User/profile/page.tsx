@@ -100,57 +100,61 @@ export default function UserProfile() {
 
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
-      <Card className="border-0 shadow-lg relative">
-        {/* Edit Profile Button - top right */}
-        {!editing && (
-          <Button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="absolute top-4 right-4 bg-rose-600 hover:bg-rose-700 flex items-center"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit Profile
-          </Button>
-        )}
-        {/* Cancel/Save Buttons - top right when editing */}
-        {editing && (
-          <div className="absolute top-4 right-4 flex gap-2">
+      <Card className="border-0 shadow-lg relative bg-white">
+        {/* Edit/Cancel/Save Buttons */}
+        <div className="absolute top-6 right-6 flex gap-2">
+          {!editing ? (
             <Button
               type="button"
-              variant="outline"
-              onClick={() => {
-                setEditing(false);
-                setFormData(profile || {});
-              }}
-              className="flex items-center"
+              onClick={() => setEditing(true)}
+              className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2 shadow-sm"
             >
-              <X className="mr-2 h-4 w-4" />
-              Cancel
+              <Pencil className="h-4 w-4" />
+              Edit Profile
             </Button>
-            <Button
-              type="submit"
-              form="profile-form"
-              className="bg-rose-600 hover:bg-rose-700 flex items-center"
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </Button>
-          </div>
-        )}
-        <CardHeader className="pb-4 space-y-4">
-          <div className="flex items-center space-x-4">
-            <div className="relative h-20 w-20 rounded-full bg-rose-100 flex items-center justify-center overflow-hidden">
-              {profile?.photo_url ? (
-                <img
-                  src={formData.photo_url || profile.photo_url}
-                  alt="Profile"
-                  className="h-20 w-20 object-cover rounded-full"
-                />
-              ) : (
-                <span className="text-2xl font-bold text-rose-600">
-                  {profile?.name?.charAt(0)?.toUpperCase() || "U"}
-                </span>
-              )}
+          ) : (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setEditing(false);
+                  setFormData(profile || {});
+                }}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="profile-form"
+                className="bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Profile Header */}
+        <CardHeader className="pb-6 border-b">
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <div className="h-24 w-24 rounded-full bg-rose-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl">
+                {profile?.photo_url ? (
+                  <img
+                    src={formData.photo_url || profile.photo_url}
+                    alt="Profile"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-bold text-rose-600">
+                    {profile?.name?.charAt(0)?.toUpperCase() || "U"}
+                  </span>
+                )}
+              </div>
               {editing && (
                 <>
                   <input
@@ -162,221 +166,265 @@ export default function UserProfile() {
                   />
                   <button
                     type="button"
-                    className="absolute bottom-0 right-0 bg-white rounded-full p-1 shadow hover:bg-gray-100"
+                    className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 border border-gray-200"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    title="Upload Photo"
                   >
-                    <UploadCloud className="w-5 h-5 text-rose-600" />
+                    <UploadCloud className="w-4 h-4 text-rose-600" />
                   </button>
                 </>
               )}
             </div>
             <div>
-              <CardTitle className="text-2xl">My Profile</CardTitle>
-              <p className="text-gray-500 mt-1">Manage your personal information</p>
+              <CardTitle className="text-2xl font-bold text-gray-900">
+                {profile?.name || "My Profile"}
+              </CardTitle>
+              <p className="text-gray-500 mt-1">
+                Manage your personal information and preferences
+              </p>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <form
-            id="profile-form"
-            onSubmit={handleSubmit}
-            className="space-y-6"
-          >
-            <div className="grid gap-6">
-              {/* Name */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Name</Label>
-                {editing ? (
-                  <Input
-                    value={formData.name || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900 font-medium text-lg">{profile?.name}</p>
-                )}
-              </div>
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Email</Label>
-                <p className="text-gray-900">{profile?.email}</p>
-              </div>
-
-              {/* Contact Number */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Contact Number</Label>
-                {editing ? (
-                  <Input
-                    value={formData.contact_number || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, contact_number: e.target.value }))
-                    }
-                    placeholder="Your contact number"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile?.contact_number || <span className="text-gray-500 italic">Not provided</span>}</p>
-                )}
-              </div>
-
-              {/* LinkedIn */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">LinkedIn Profile</Label>
-                {editing ? (
-                  <Input
-                    value={formData.linkedin || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, linkedin: e.target.value }))
-                    }
-                    placeholder="https://linkedin.com/in/yourprofile"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    {profile?.linkedin ? (
-                      <a
-                        href={profile.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-rose-600 hover:underline"
-                      >
-                        {profile.linkedin}
-                      </a>
+        <CardContent className="pt-8">
+          <form id="profile-form" onSubmit={handleSubmit}>
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Left Column */}
+              <div className="space-y-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Basic Information
+                  </h3>
+                  
+                  {/* Name Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Full Name</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.name || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, name: e.target.value }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                      />
                     ) : (
-                      <p className="text-gray-500 italic">Not provided</p>
+                      <p className="text-gray-900 font-medium">{profile?.name}</p>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* GitHub */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">GitHub</Label>
-                {editing ? (
-                  <Input
-                    value={formData.github || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, github: e.target.value }))
-                    }
-                    placeholder="https://github.com/yourusername"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    {profile?.github ? (
-                      <a
-                        href={profile.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-rose-600 hover:underline"
-                      >
-                        {profile.github}
-                      </a>
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Email Address</Label>
+                    <p className="text-gray-900">{profile?.email}</p>
+                  </div>
+
+                  {/* Contact Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Contact Number</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.contact_number || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            contact_number: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="Enter your contact number"
+                      />
                     ) : (
-                      <p className="text-gray-500 italic">Not provided</p>
+                      <p className="text-gray-900">
+                        {profile?.contact_number || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
                     )}
                   </div>
-                )}
+                </div>
+
+                {/* Education Section */}
+                <div className="space-y-6 pt-6 border-t">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Educational Background
+                  </h3>
+                  
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Education</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.education || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            education: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="Enter your educational background"
+                      />
+                    ) : (
+                      <p className="text-gray-900">
+                        {profile?.education || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Years of Experience</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.years_of_experience || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            years_of_experience: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="Enter years of experience"
+                      />
+                    ) : (
+                      <p className="text-gray-900">
+                        {profile?.years_of_experience || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Educational Background */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Educational Background</Label>
-                {editing ? (
-                  <Input
-                    value={formData.education || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, education: e.target.value }))
-                    }
-                    placeholder="Your education"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile?.education || <span className="text-gray-500 italic">Not provided</span>}</p>
-                )}
-              </div>
+              {/* Right Column */}
+              <div className="space-y-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Professional Links
+                  </h3>
 
-              {/* Years of Experience */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Years of Experience</Label>
-                {editing ? (
-                  <Input
-                    value={formData.years_of_experience || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, years_of_experience: e.target.value }))
-                    }
-                    placeholder="e.g. 2"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile?.years_of_experience || <span className="text-gray-500 italic">Not provided</span>}</p>
-                )}
-              </div>
+                  {/* LinkedIn Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">LinkedIn Profile</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.linkedin || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            linkedin: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="https://linkedin.com/in/username"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {profile?.linkedin ? (
+                          <a
+                            href={profile.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-rose-600 hover:underline"
+                          >
+                            {profile.linkedin}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )
+                        }
+                      </div>
+                    )}
+                  </div>
 
-              {/* Programming Languages */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Programming Languages</Label>
-                {editing ? (
-                  <Input
-                    value={formData.programming_languages || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, programming_languages: e.target.value }))
-                    }
-                    placeholder="e.g. JavaScript, Python"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile?.programming_languages || <span className="text-gray-500 italic">Not provided</span>}</p>
-                )}
-              </div>
+                  {/* GitHub Field */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">GitHub Profile</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.github || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            github: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="https://github.com/username"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {profile?.github ? (
+                          <a
+                            href={profile.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-rose-600 hover:underline"
+                          >
+                            {profile.github}
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-              {/* Areas of Expertise */}
-              <div className="space-y-2">
-                <Label className="text-gray-700 font-medium">Areas of Expertise</Label>
-                {editing ? (
-                  <Input
-                    value={formData.expertise || ""}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, expertise: e.target.value }))
-                    }
-                    placeholder="e.g. Web Development, AI"
-                    className="border-gray-200 focus:border-rose-500"
-                  />
-                ) : (
-                  <p className="text-gray-900">{profile?.expertise || <span className="text-gray-500 italic">Not provided</span>}</p>
-                )}
-              </div>
-            </div>
+                {/* Skills Section */}
+                <div className="space-y-6 pt-6 border-t">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Skills & Expertise
+                  </h3>
 
-            <div className="flex justify-end space-x-3 pt-4 border-t">
-              {editing ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setEditing(false);
-                      setFormData(profile || {});
-                    }}
-                    className="flex items-center"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-rose-600 hover:bg-rose-700 flex items-center"
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Changes
-                  </Button>
-                </>
-              ) : null}
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Programming Languages</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.programming_languages || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            programming_languages: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="e.g. JavaScript, Python, Java"
+                      />
+                    ) : (
+                      <p className="text-gray-900">
+                        {profile?.programming_languages || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-700">Areas of Expertise</Label>
+                    {editing ? (
+                      <Input
+                        value={formData.expertise || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            expertise: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 focus:border-rose-500"
+                        placeholder="e.g. Web Development, Machine Learning"
+                      />
+                    ) : (
+                      <p className="text-gray-900">
+                        {profile?.expertise || (
+                          <span className="text-gray-400 italic">Not provided</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </form>
         </CardContent>
