@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Pencil, Trash2 } from "lucide-react"; // Add this import
+import { TiptapEditor } from "@/components/ui/tiptap-editor";
 
 type Event = {
   id: string;
@@ -650,13 +651,10 @@ export default function AdminDashboard() {
                   <Label htmlFor="description" className="text-gray-700">
                     Description
                   </Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Enter event description"
-                    value={form.description || ""}
-                    onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                    rows={4}
-                    className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                  <TiptapEditor
+                    content={form.description || ""}
+                    onChange={(content) => setForm(f => ({ ...f, description: content }))}
+                    placeholder="Enter event description..."
                   />
                 </div>
 
@@ -830,7 +828,7 @@ export default function AdminDashboard() {
       ) : (
         <div className="w-full grid grid-cols-1 gap-8">
           {events.map((event) => (
-            <div key={event.id} className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72">
+            <div key={event.id} className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-96 md:h-80">
               {/* Admin Actions - Add this new section */}
               <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
                 <Button
@@ -863,7 +861,7 @@ export default function AdminDashboard() {
                 </Button>
               </div>
 
-              <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+              <div className="md:w-2/5 w-full h-80 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                 {event.image_url ? (
                   <img
                     src={event.image_url}
@@ -885,7 +883,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
                 <div className="flex-1 overflow-hidden">
-                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <div className="flex flex-wrap items-center gap-3 mb-3">
                     <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
                       {event.title}
                     </h3>
@@ -899,7 +897,19 @@ export default function AdminDashboard() {
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-4">
+                  
+                  {/* Price Display - moved up for better visibility */}
+                  <div className="mb-3">
+                    <span className={`text-lg font-semibold ${
+                      event.is_paid 
+                        ? "text-green-600" 
+                        : "text-blue-600"
+                    }`}>
+                      {event.is_paid ? `₹${event.price}` : 'Free Entry'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-3">
                     <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                       <CalendarIcon className="w-4 h-4 text-rose-500" />
                       <span className="text-sm">
@@ -922,13 +932,22 @@ export default function AdminDashboard() {
                       {event.event_type === "virtual" ? "Virtual Event" : event.location}
                     </span>
                   </div>
-                  <div className="pt-2">
-                    <span className={`text-lg font-semibold ${
-                      event.is_paid 
-                        ? "text-green-600" 
-                        : "text-blue-600"
-                    }`}>
-                      {event.is_paid ? `₹${event.price}` : 'Free Entry'}
+                  <div className="flex items-center gap-3 mb-2">
+                    <Switch
+                      checked={event.is_public}
+                      onCheckedChange={async (checked) => {
+                        const res = await fetch(`/api/events/${event.id}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ is_public: checked })
+                        });
+                        if (res.ok) {
+                          window.location.reload();
+                        }
+                      }}
+                    />
+                    <span className="text-sm text-gray-600">
+                      {event.is_public ? 'Public' : 'Private'}
                     </span>
                   </div>
                 </div>
@@ -1235,13 +1254,10 @@ export default function AdminDashboard() {
                   <Label htmlFor="description" className="text-gray-700">
                     Description
                   </Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Enter event description"
-                    value={form.description || ""}
-                    onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-                    rows={4}
-                    className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+                  <TiptapEditor
+                    content={form.description || ""}
+                    onChange={(content) => setForm(f => ({ ...f, description: content }))}
+                    placeholder="Enter event description..."
                   />
                 </div>
 

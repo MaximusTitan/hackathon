@@ -453,10 +453,11 @@ export default function EventDetailsPage() {
 
           {event.description && (
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">About this event</h2>
-              <div className="prose text-gray-700 max-w-none">
-                <p>{event.description}</p>
-              </div>
+              <h2 className="text-xl font-semibold text-rose-600 mb-4">About this event</h2>
+              <div 
+                className="prose prose-gray max-w-none text-gray-700"
+                dangerouslySetInnerHTML={{ __html: event.description }}
+              />
             </div>
           )}
 

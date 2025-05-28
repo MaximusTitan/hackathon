@@ -194,7 +194,7 @@ export default function Home() {
                 </div>
                 <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
                   <div className="flex-1 overflow-hidden">
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
                         {event.title}
                       </h3>
@@ -214,6 +214,10 @@ export default function Home() {
                             {event.start_time} - {event.end_time}
                           </span>
                         </span>
+                      </div>
+
+                      {/* Location on separate line */}
+                      <div className="flex items-center gap-2 text-gray-600">
                         <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                           <MapPin className="w-4 h-4 text-rose-500" />
                           <span className="text-sm">
@@ -222,7 +226,7 @@ export default function Home() {
                         </span>
                       </div>
 
-                      <div className="pt-2">
+                      <div className="pt-1">
                         <span className={`text-lg font-semibold ${
                           event.is_paid 
                             ? "text-green-600" 
@@ -233,7 +237,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-4 flex justify-between items-end">
+                  <div className="mt-3 flex justify-between items-end">
                     {/* Add Facepile in bottom left */}
                     <div className="flex-1">
                       <Facepile
