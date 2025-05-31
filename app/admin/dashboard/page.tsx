@@ -95,38 +95,148 @@ export default function AdminDashboard() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [participantData, setParticipantData] = useState<Record<string, { count: number; loading: boolean }>>({});
   const supabase = createClientComponentClient();
 
   useEffect(() => {
-    async function fetchEvents() {
-      const res = await fetch("/api/events");
-      const data = await res.json();
-      
-      const currentDate = new Date();
-      const allEvents = data.events || [];
-      
-      // Split events into upcoming and past
-      const { upcoming, past } = allEvents.reduce((acc: { upcoming: Event[], past: Event[] }, event: Event) => {
-        const eventDate = new Date(event.start_date || "");
-        if (eventDate >= currentDate) {
-          acc.upcoming.push(event);
-        } else {
-          acc.past.push(event);
+    async function fetchEventsOptimized() {
+      try {
+        setLoading(true);
+        
+        // Fetch events first and show them immediately
+        const res = await fetch("/api/events");
+        const data = await res.json();
+        
+        const currentDate = new Date();
+        const allEvents = data.events || [];
+        
+        // Split events into upcoming and past
+        const { upcoming, past } = allEvents.reduce((acc: { upcoming: Event[], past: Event[] }, event: Event) => {
+          const eventDate = new Date(event.start_date || "");
+          if (eventDate >= currentDate) {
+            acc.upcoming.push(event);
+          } else {
+            acc.past.push(event);
+          }
+          return acc;
+        }, { upcoming: [], past: [] });
+
+        // Sort both arrays by created_at
+        const sortByDate = (a: Event, b: Event) => {
+          const dateA = new Date(a.created_at || "");
+          const dateB = new Date(b.created_at || "");
+          return dateB.getTime() - dateA.getTime();
+        };
+
+        const filteredEvents = showPastEvents ? past.sort(sortByDate) : upcoming.sort(sortByDate);
+        
+        // Show events immediately
+        setEvents(filteredEvents);
+        setLoading(false);
+
+        // If no events, stop here
+        if (filteredEvents.length === 0) {
+          return;
         }
-        return acc;
-      }, { upcoming: [], past: [] });
 
-      // Sort both arrays by created_at
-      const sortByDate = (a: Event, b: Event) => {
-        const dateA = new Date(a.created_at || "");
-        const dateB = new Date(b.created_at || "");
-        return dateB.getTime() - dateA.getTime();
-      };
+        // Initialize participant data with loading states
+        const initialData: Record<string, { count: number; loading: boolean }> = {};
+        filteredEvents.forEach(event => {
+          initialData[event.id] = {
+            count: 0,
+            loading: true
+          };
+        });
+        setParticipantData(initialData);
 
-      setEvents(showPastEvents ? past.sort(sortByDate) : upcoming.sort(sortByDate));
-      setLoading(false);
+        // Load participant counts progressively (prioritize first 3 events)
+        const priorityEvents = filteredEvents.slice(0, 3);
+        const remainingEvents = filteredEvents.slice(3);
+
+        // Load priority events first (no delay)
+        priorityEvents.forEach(async (event, index) => {
+          try {
+            // Small stagger for priority events
+            if (index > 0) {
+              await new Promise(resolve => setTimeout(resolve, index * 50));
+            }
+            
+            const res = await fetch(`/api/events/${event.id}/participants/preview`);
+            if (res.ok) {
+              const data = await res.json();
+              setParticipantData(prev => ({
+                ...prev,
+                [event.id]: {
+                  count: data.count || 0,
+                  loading: false
+                }
+              }));
+            } else {
+              setParticipantData(prev => ({
+                ...prev,
+                [event.id]: {
+                  count: 0,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error(`Error fetching participant count for priority event ${event.id}:`, error);
+            setParticipantData(prev => ({
+              ...prev,
+              [event.id]: {
+                count: 0,
+                loading: false
+              }
+            }));
+          }
+        });
+
+        // Load remaining events with slight delay
+        remainingEvents.forEach(async (event, index) => {
+          try {
+            // Delay for remaining events to not interfere with priority loading
+            await new Promise(resolve => setTimeout(resolve, 300 + (index * 100)));
+            
+            const res = await fetch(`/api/events/${event.id}/participants/preview`);
+            if (res.ok) {
+              const data = await res.json();
+              setParticipantData(prev => ({
+                ...prev,
+                [event.id]: {
+                  count: data.count || 0,
+                  loading: false
+                }
+              }));
+            } else {
+              setParticipantData(prev => ({
+                ...prev,
+                [event.id]: {
+                  count: 0,
+                  loading: false
+                }
+              }));
+            }
+          } catch (error) {
+            console.error(`Error fetching participant count for event ${event.id}:`, error);
+            setParticipantData(prev => ({
+              ...prev,
+              [event.id]: {
+                count: 0,
+                loading: false
+              }
+            }));
+          }
+        });
+
+      } catch (error) {
+        console.error('Error fetching events:', error);
+        setEvents([]);
+        setLoading(false);
+      }
     }
-    fetchEvents();
+    
+    fetchEventsOptimized();
   }, [showPastEvents]);
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,8 +350,56 @@ export default function AdminDashboard() {
       return dateB.getTime() - dateA.getTime();
     };
 
-    setEvents(showPastEvents ? past.sort(sortByDate) : upcoming.sort(sortByDate));
+    const filteredEvents = showPastEvents ? past.sort(sortByDate) : upcoming.sort(sortByDate);
+    setEvents(filteredEvents);
     setLoading(false);
+
+    // Load participant counts for new events
+    if (filteredEvents.length > 0) {
+      const initialData: Record<string, { count: number; loading: boolean }> = {};
+      filteredEvents.forEach(event => {
+        initialData[event.id] = {
+          count: 0,
+          loading: true
+        };
+      });
+      setParticipantData(initialData);
+
+      // Load all participant counts
+      filteredEvents.forEach(async (event, index) => {
+        try {
+          await new Promise(resolve => setTimeout(resolve, index * 50));
+          
+          const res = await fetch(`/api/events/${event.id}/participants/preview`);
+          if (res.ok) {
+            const data = await res.json();
+            setParticipantData(prev => ({
+              ...prev,
+              [event.id]: {
+                count: data.count || 0,
+                loading: false
+              }
+            }));
+          } else {
+            setParticipantData(prev => ({
+              ...prev,
+              [event.id]: {
+                count: 0,
+                loading: false
+              }
+            }));
+          }
+        } catch (error) {
+          setParticipantData(prev => ({
+            ...prev,
+            [event.id]: {
+              count: 0,
+              loading: false
+            }
+          }));
+        }
+      });
+    }
   };
 
   async function handleEditEvent(e: React.FormEvent) {
@@ -925,163 +1083,186 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="w-full grid grid-cols-1 gap-8">
-          {events.map((event) => (
-            <div key={event.id} className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-96 md:h-80">
-              {/* Admin Actions - Add this new section */}
-              <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-                <Button
-                  onClick={() => startEditing(event)}
-                  className="w-9 h-9 p-0 text-gray-500 hover:text-blue-600"
-                  title="Edit event"
-                  variant="ghost"
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (window.confirm(`Are you sure you want to delete the event '${event.title}'? This action cannot be undone.`)) {
-                      const res = await fetch(`/api/events/${event.id}`, {
-                        method: 'DELETE',
-                      });
-                      if (res.ok) {
-                        toast.success('Event deleted successfully');
-                        setEvents(events.filter(e => e.id !== event.id));
-                      } else {
-                        toast.error('Failed to delete event');
-                      }
-                    }
-                  }}
-                  className="w-9 h-9 p-0 text-gray-500 hover:text-red-600"
-                  title="Delete event"
-                  variant="ghost"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="md:w-2/5 w-full h-80 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
-                {event.image_url ? (
-                  <img
-                    src={event.image_url}
-                    alt={event.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
-                    onError={(e) => {
-                      const img = e.currentTarget;
-                      img.onerror = null;
-                      img.src = "/placeholder-event.png";
-                      img.className = "w-4/5 h-4/5 object-contain opacity-50";
-                    }}
-                  />
-                ) : (
-                  <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
-                    {event.title.charAt(0)}
-                  </span>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
-              </div>
-              <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex flex-wrap items-center gap-3 mb-3">
-                    <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
-                      {event.title}
-                    </h3>
-                    {event.is_public ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        Public
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                        Private
-                      </span>
-                    )}
-                  </div>
-                  
-                  {/* Price Display - moved up for better visibility */}
-                  <div className="mb-3">
-                    <span className={`text-lg font-semibold ${
-                      event.is_paid 
-                        ? "text-green-600" 
-                        : "text-blue-600"
-                    }`}>
-                      {event.is_paid ? `₹${event.price}` : 'Free Entry'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-3">
-                    <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
-                      <CalendarIcon className="w-4 h-4 text-rose-500" />
-                      <span className="text-sm">
-                        {event.start_date}
-                        {event.end_date && event.end_date !== event.start_date && (
-                          <span> - {event.end_date}</span>
-                        )}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
-                      <Clock className="w-4 h-4 text-rose-500" />
-                      <span className="text-sm">
-                        {event.start_time} - {event.end_time}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-600 mb-2">
-                    <MapPin className="w-4 h-4 text-rose-500" />
-                    <span className="text-sm">
-                      {event.event_type === "virtual" ? "Virtual Event" : event.location}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <Switch
-                      checked={event.is_public}
-                      onCheckedChange={async (checked) => {
+          {events.map((event, index) => {
+            const eventParticipantData = participantData[event.id];
+            const isParticipantLoading = eventParticipantData?.loading !== false;
+            
+            return (
+              <div 
+                key={event.id} 
+                className={`w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-96 md:h-80 ${
+                  // Add staggered animation for visual appeal
+                  index < 3 ? 'animate-in slide-in-from-bottom-4' : ''
+                }`}
+                style={{
+                  // Stagger animation delay for first 3 cards
+                  animationDelay: index < 3 ? `${index * 100}ms` : '0ms'
+                }}
+              >
+                {/* Admin Actions */}
+                <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                  <Button
+                    onClick={() => startEditing(event)}
+                    className="w-9 h-9 p-0 text-gray-500 hover:text-blue-600"
+                    title="Edit event"
+                    variant="ghost"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (window.confirm(`Are you sure you want to delete the event '${event.title}'? This action cannot be undone.`)) {
                         const res = await fetch(`/api/events/${event.id}`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ is_public: checked })
+                          method: 'DELETE',
                         });
                         if (res.ok) {
-                          window.location.reload();
+                          toast.success('Event deleted successfully');
+                          setEvents(events.filter(e => e.id !== event.id));
+                        } else {
+                          toast.error('Failed to delete event');
                         }
+                      }
+                    }}
+                    className="w-9 h-9 p-0 text-gray-500 hover:text-red-600"
+                    title="Delete event"
+                    variant="ghost"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="md:w-2/5 w-full h-80 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+                  {event.image_url ? (
+                    <img
+                      src={event.image_url}
+                      alt={event.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        img.onerror = null;
+                        img.src = "/placeholder-event.png";
+                        img.className = "w-4/5 h-4/5 object-contain opacity-50";
                       }}
+                      // Lazy loading for images after the first 3
+                      loading={index < 3 ? "eager" : "lazy"}
                     />
-                    <span className="text-sm text-gray-600">
-                      {event.is_public ? 'Public' : 'Private'}
+                  ) : (
+                    <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
+                      {event.title.charAt(0)}
                     </span>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent"></div>
+                </div>
+                <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex flex-wrap items-center gap-3 mb-3">
+                      <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
+                        {event.title}
+                      </h3>
+                      {event.is_public ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                          Public
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          Private
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Price Display */}
+                    <div className="mb-3">
+                      <span className={`text-lg font-semibold ${
+                        event.is_paid 
+                          ? "text-green-600" 
+                          : "text-blue-600"
+                      }`}>
+                        {event.is_paid ? `₹${event.price}` : 'Free Entry'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-3">
+                      <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                        <CalendarIcon className="w-4 h-4 text-rose-500" />
+                        <span className="text-sm">
+                          {event.start_date}
+                          {event.end_date && event.end_date !== event.start_date && (
+                            <span> - {event.end_date}</span>
+                          )}
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                        <Clock className="w-4 h-4 text-rose-500" />
+                        <span className="text-sm">
+                          {event.start_time} - {event.end_time}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-600 mb-2">
+                      <MapPin className="w-4 h-4 text-rose-500" />
+                      <span className="text-sm">
+                        {event.event_type === "virtual" ? "Virtual Event" : event.location}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-2">
+                      <Switch
+                        checked={event.is_public}
+                        onCheckedChange={async (checked) => {
+                          const res = await fetch(`/api/events/${event.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_public: checked })
+                          });
+                          if (res.ok) {
+                            window.location.reload();
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-gray-600">
+                        {event.is_public ? 'Public' : 'Private'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                    <Link
+                      href={`/User/events/${event.id}`}
+                      className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
+                    >
+                      View Details
+                    </Link>
+                    <Link
+                      href={`/admin/event-registrations/${event.id}`}
+                      className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 py-2.5 px-6 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-200"
+                    >
+                      Registrations
+                      {!isParticipantLoading && eventParticipantData?.count ? (
+                        <span className="bg-rose-600 text-white text-xs px-2 py-1 rounded-full">
+                          {eventParticipantData.count}
+                        </span>
+                      ) : null}
+                    </Link>
+                    {/* Copy Link button for private events */}
+                    {!event.is_public && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="inline-flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-100"
+                        onClick={async () => {
+                          const url = `${window.location.origin}/User/events/${event.id}`;
+                          await navigator.clipboard.writeText(url);
+                          toast.success("Event link copied to clipboard!");
+                        }}
+                        title="Copy private event link"
+                      >
+                        <Clipboard className="w-4 h-4 mr-1" /> Copy Link
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-                  <Link
-                    href={`/User/events/${event.id}`}
-                    className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
-                  >
-                    View Details
-                  </Link>
-                  <Link
-                    href={`/admin/event-registrations/${event.id}`}
-                    className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 py-2.5 px-6 rounded-lg hover:bg-gray-200 transition-colors font-medium border border-gray-200"
-                  >
-                    Registrations
-                  </Link>
-                  {/* Copy Link button for private events */}
-                  {!event.is_public && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="inline-flex items-center gap-2 border-gray-300 text-gray-700 hover:bg-gray-100"
-                      onClick={async () => {
-                        const url = `${window.location.origin}/User/events/${event.id}`;
-                        await navigator.clipboard.writeText(url);
-                        toast.success("Event link copied to clipboard!");
-                      }}
-                      title="Copy private event link"
-                    >
-                      <Clipboard className="w-4 h-4 mr-1" /> Copy Link
-                    </Button>
-                  )}
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
