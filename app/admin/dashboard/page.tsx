@@ -350,61 +350,6 @@ export default function AdminDashboard() {
     setImagePreview(null);
   };
 
-  // Admin Event Card Skeleton component
-  const AdminEventCardSkeleton = () => (
-    <div className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 flex flex-col md:flex-row overflow-hidden h-96 md:h-80 animate-pulse">
-      {/* Action buttons skeleton */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-        <div className="w-9 h-9 bg-gray-200 rounded"></div>
-        <div className="w-9 h-9 bg-gray-200 rounded"></div>
-      </div>
-
-      <div className="md:w-2/5 w-full h-80 md:h-full relative flex-shrink-0 bg-gray-200">
-        <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300"></div>
-      </div>
-      
-      <div className="flex-1 p-8 flex flex-col justify-between bg-white min-h-0">
-        <div className="flex-1 overflow-hidden">
-          <div className="space-y-3">
-            {/* Title and badges skeleton */}
-            <div className="flex items-center gap-3">
-              <div className="h-8 bg-gray-200 rounded-lg w-2/3"></div>
-              <div className="h-6 bg-gray-200 rounded-full w-16"></div>
-            </div>
-            
-            {/* Price skeleton */}
-            <div className="h-6 bg-gray-200 rounded w-20"></div>
-            
-            {/* Date and time badges skeleton */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="h-8 bg-gray-200 rounded-full w-32"></div>
-              <div className="h-8 bg-gray-200 rounded-full w-28"></div>
-            </div>
-
-            {/* Location skeleton */}
-            <div className="flex items-center gap-2">
-              <div className="h-5 w-5 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-40"></div>
-            </div>
-
-            {/* Toggle skeleton */}
-            <div className="flex items-center gap-3">
-              <div className="h-6 w-10 bg-gray-200 rounded-full"></div>
-              <div className="h-4 bg-gray-200 rounded w-16"></div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-          {/* Button skeletons */}
-          <div className="h-12 bg-gray-200 rounded-lg w-32"></div>
-          <div className="h-12 bg-gray-200 rounded-lg w-32"></div>
-          <div className="h-12 bg-gray-200 rounded-lg w-28"></div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="w-full max-w-6xl mx-auto p-6">
       <header className="flex justify-between items-center mb-8">
@@ -877,52 +822,9 @@ export default function AdminDashboard() {
       )}
 
       {loading ? (
-        <div className="space-y-8">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-3 text-gray-500">
-              <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-lg font-medium">Loading events...</span>
-            </div>
-            <p className="text-gray-400 mt-2">Fetching event data from dashboard</p>
-          </div>
-          
-          <div className="w-full grid grid-cols-1 gap-8">
-            {/* Show 3 skeleton cards */}
-            {[1, 2, 3].map((i) => (
-              <AdminEventCardSkeleton key={i} />
-            ))}
-          </div>
-          
-          {/* Additional loading indicators */}
-          <div className="flex justify-center items-center gap-2 py-4">
-            <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-            <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          </div>
-        </div>
+        <div className="text-center text-gray-500">Loading events...</div>
       ) : events.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-            <CalendarIcon className="w-12 h-12 text-gray-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">
-            No {showPastEvents ? "past" : "upcoming"} events found
-          </h3>
-          <p className="text-gray-500 max-w-md mx-auto">
-            {showPastEvents 
-              ? "No past events to display. Create some events to see them here later."
-              : "Start by creating your first event to manage and organize community gatherings."
-            }
-          </p>
-          {!showPastEvents && (
-            <Button
-              className="mt-4 bg-rose-600 hover:bg-rose-700 text-white"
-              onClick={() => setShowCreate(true)}
-            >
-              Create Your First Event
-            </Button>
-          )}
-        </div>
+        <div className="text-center text-gray-500">No events found.</div>
       ) : (
         <div className="w-full grid grid-cols-1 gap-8">
           {events.map((event) => (
