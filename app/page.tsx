@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 type Participant = {
   id: string;
@@ -57,28 +58,36 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedEventParticipants, setSelectedEventParticipants] = useState<Participant[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showPastEvents, setShowPastEvents] = useState(false);
   
   // Store participant data separately with loading states
   const [participantData, setParticipantData] = useState<Record<string, ParticipantData>>({});
 
-  // First useEffect: Fetch events quickly without participant data
+  // Modified useEffect: Fetch events and participants in one optimized call
   useEffect(() => {
-    async function fetchEvents() {
+    async function fetchEventsAndParticipants() {
       try {
-        const res = await fetch("/api/events");
-        let data: any = {};
+        setLoading(true);
+        
+        // Fetch events first
+        const eventsRes = await fetch("/api/events");
+        let eventsData: any = {};
         try {
-          data = await res.json();
+          eventsData = await eventsRes.json();
         } catch (err) {
-          data = {};
+          eventsData = {};
         }
 
-        // Filter out past events and sort by created_at
+        // Filter events based on showPastEvents state
         const currentDate = new Date();
-        const upcomingEvents = (data.events || [])
+        const filteredEvents = (eventsData.events || [])
           .filter((event: Event) => {
             const eventDate = new Date(event.start_date || "");
-            return eventDate >= currentDate;
+            if (showPastEvents) {
+              return eventDate < currentDate; // Past events
+            } else {
+              return eventDate >= currentDate; // Upcoming events
+            }
           })
           .sort((a: Event, b: Event) => {
             const dateA = new Date(a.created_at || "");
@@ -86,72 +95,99 @@ export default function Home() {
             return dateB.getTime() - dateA.getTime();
           });
 
-        setEvents(upcomingEvents);
+        setEvents(filteredEvents);
+
+        // If no events, stop here
+        if (filteredEvents.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // Initialize loading state for all events
+        const initialData: Record<string, ParticipantData> = {};
+        // Initialize loading state for all events
+        interface InitialParticipantData {
+          count: number;
+          participants: Participant[];
+          loading: boolean;
+        }
+
+        type InitialDataMap = Record<string, InitialParticipantData>;
+        
+        filteredEvents.forEach((event: Event): void => {
+          initialData[event.id] = {
+            count: 0,
+            participants: [],
+            loading: true
+          } as InitialParticipantData;
+        });
+        setParticipantData(initialData);
+
+        // Batch fetch participant data for all events at once
+        const eventIds: string[] = filteredEvents.map((event: Event) => event.id);
+        
+        try {
+          const participantsRes = await fetch('/api/events/participants/batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventIds })
+          });
+
+          if (participantsRes.ok) {
+            const participantsData = await participantsRes.json();
+            
+            // Update participant data for all events at once
+            setParticipantData(prev => {
+              const updated = { ...prev };
+              Object.keys(participantsData).forEach(eventId => {
+                updated[eventId] = {
+                  count: participantsData[eventId]?.count || 0,
+                  participants: participantsData[eventId]?.participants || [],
+                  loading: false
+                };
+              });
+              return updated;
+            });
+          } else {
+            // Fallback: Set empty data for all events
+            setParticipantData(prev => {
+              const updated = { ...prev };
+              eventIds.forEach(eventId => {
+                updated[eventId] = {
+                  count: 0,
+                  participants: [],
+                  loading: false
+                };
+              });
+              return updated;
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching batch participant data:', error);
+          // Set empty data for all events on error
+          setParticipantData(prev => {
+            const updated = { ...prev };
+            eventIds.forEach(eventId => {
+              updated[eventId] = {
+                count: 0,
+                participants: [],
+                loading: false
+              };
+            });
+            return updated;
+          });
+        }
+
         setLoading(false);
       } catch (error) {
+        console.error('Error fetching events:', error);
         setEvents([]);
         setLoading(false);
       }
     }
-    fetchEvents();
-  }, []);
-
-  // Second useEffect: Fetch participant data after events are loaded
-  useEffect(() => {
-    if (events.length === 0) return;
     
-    // Initialize loading state for all events
-    const initialData: Record<string, ParticipantData> = {};
-    events.forEach(event => {
-      initialData[event.id] = {
-        count: 0,
-        participants: [],
-        loading: true
-      };
-    });
-    setParticipantData(initialData);
-    
-    // Fetch participant data for each event progressively
-    events.forEach(async (event, index) => {
-      try {
-        // Add a small delay to stagger requests and avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, index * 100));
-        
-        const res = await fetch(`/api/events/${event.id}/participants/preview`);
-        if (res.ok) {
-          const data = await res.json();
-          setParticipantData(prev => ({
-            ...prev,
-            [event.id]: {
-              count: data.count || 0,
-              participants: data.participants || [],
-              loading: false
-            }
-          }));
-        } else {
-          // Set empty data if fetch fails
-          setParticipantData(prev => ({
-            ...prev,
-            [event.id]: {
-              count: 0,
-              participants: [],
-              loading: false
-            }
-          }));
-        }
-      } catch (error) {
-        console.error(`Error fetching participant preview for event ${event.id}:`, error);
-        setParticipantData(prev => ({
-          ...prev,
-          [event.id]: {
-            count: 0,
-            participants: [],
-            loading: false
-          }
-        }));
-      }
-    });
-  }, [events]);
+    fetchEventsAndParticipants();
+  }, [showPastEvents]);
 
   // Format the date display for consistency
   const formatDateRange = (
@@ -280,6 +316,23 @@ export default function Home() {
         <p className="text-gray-600 text-lg">Discover and join amazing events.</p>
       </header>
 
+      {/* Add toggle section */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">
+          {showPastEvents ? "Past Events" : "Upcoming Events"}
+        </h2>
+        <Button
+          onClick={() => setShowPastEvents(!showPastEvents)}
+          className={`${
+            showPastEvents 
+              ? "bg-gray-600 hover:bg-gray-700" 
+              : "bg-rose-600 hover:bg-rose-700"
+          } text-white`}
+        >
+          Show {showPastEvents ? "Upcoming" : "Past"} Events
+        </Button>
+      </div>
+
       <section>
         {loading ? (
           <div className="space-y-8">
@@ -310,9 +363,14 @@ export default function Home() {
             <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
               <CalendarIcon className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No events found</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              No {showPastEvents ? "past" : "upcoming"} events found
+            </h3>
             <p className="text-gray-500 max-w-md mx-auto">
-              There are currently no upcoming events available. Check back soon for exciting new events!
+              {showPastEvents 
+                ? "No past events to display. Check back after attending some events!"
+                : "There are currently no upcoming events available. Check back soon for exciting new events!"
+              }
             </p>
           </div>
         ) : (
@@ -326,12 +384,23 @@ export default function Home() {
                   key={event.id}
                   className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72"
                 >
+                  {/* Add past event indicator */}
+                  {showPastEvents && (
+                    <div className="absolute top-4 left-4 z-10">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-300">
+                        Past Event
+                      </span>
+                    </div>
+                  )}
+
                   <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                     {event.image_url ? (
                       <img
                         src={event.image_url}
                         alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
+                        className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out ${
+                          showPastEvents ? "opacity-75" : ""
+                        }`}
                         onError={(e) => {
                           const img = e.currentTarget;
                           img.onerror = null;
@@ -340,7 +409,9 @@ export default function Home() {
                         }}
                       />
                     ) : (
-                      <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
+                      <span className={`text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150 ${
+                        showPastEvents ? "opacity-60" : ""
+                      }`}>
                         {event.title.charAt(0)}
                       </span>
                     )}
@@ -349,7 +420,9 @@ export default function Home() {
                   <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
                     <div className="flex-1 overflow-hidden">
                       <div className="space-y-3">
-                        <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
+                        <h3 className={`font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2 ${
+                          showPastEvents ? "text-gray-700" : ""
+                        }`}>
                           {event.title}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2 text-gray-600">
@@ -432,7 +505,7 @@ export default function Home() {
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-2">
                                 <Users className="w-5 h-5 text-rose-500" />
-                                Registered Participants
+                                {showPastEvents ? "Event Participants" : "Registered Participants"}
                                 <span className="text-base text-gray-500 font-normal">
                                   ({selectedEventParticipants.length})
                                 </span>
@@ -442,7 +515,7 @@ export default function Home() {
                               <div className="space-y-3">
                                 {selectedEventParticipants.length === 0 ? (
                                   <p className="text-gray-500 text-center py-4">
-                                    No participants registered yet.
+                                    {showPastEvents ? "No participants found." : "No participants registered yet."}
                                   </p>
                                 ) : (
                                   selectedEventParticipants.map((participant) => (
@@ -483,7 +556,11 @@ export default function Home() {
                       </div>
                       <Link
                         href={`/User/events/${event.id}`}
-                        className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
+                        className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${
+                          showPastEvents 
+                            ? "bg-gray-600 hover:bg-gray-700 text-white shadow-gray-100 hover:shadow-gray-200"
+                            : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100 hover:shadow-rose-200"
+                        }`}
                       >
                         View Details
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
