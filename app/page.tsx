@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
 type Participant = {
   id: string;
@@ -57,14 +58,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedEventParticipants, setSelectedEventParticipants] = useState<Participant[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showPastEvents, setShowPastEvents] = useState(false);
   
   // Store participant data separately with loading states
   const [participantData, setParticipantData] = useState<Record<string, ParticipantData>>({});
 
-  // First useEffect: Fetch events quickly without participant data
+  // Optimized useEffect: Show events immediately, load participants after
   useEffect(() => {
-    async function fetchEvents() {
+    async function fetchEventsOptimized() {
       try {
+        setLoading(true);
+        
+        // Fetch events first and show them immediately
         const res = await fetch("/api/events");
         let data: any = {};
         try {
@@ -73,12 +78,16 @@ export default function Home() {
           data = {};
         }
 
-        // Filter out past events and sort by created_at
+        // Filter and sort events
         const currentDate = new Date();
-        const upcomingEvents = (data.events || [])
+        const filteredEvents = (data.events || [])
           .filter((event: Event) => {
             const eventDate = new Date(event.start_date || "");
-            return eventDate >= currentDate;
+            if (showPastEvents) {
+              return eventDate < currentDate;
+            } else {
+              return eventDate >= currentDate;
+            }
           })
           .sort((a: Event, b: Event) => {
             const dateA = new Date(a.created_at || "");
@@ -86,15 +95,149 @@ export default function Home() {
             return dateB.getTime() - dateA.getTime();
           });
 
-        setEvents(upcomingEvents);
+        // Show events immediately
+        setEvents(filteredEvents);
         setLoading(false);
+
+        // If no events, stop here
+        if (filteredEvents.length === 0) {
+          return;
+        }
+
+        // Initialize participant data with loading states
+        const initialData: Record<string, ParticipantData> = {};
+        interface InitialDataEntry {
+          count: number;
+          participants: Participant[];
+          loading: boolean;
+        }
+
+        filteredEvents.forEach((event: Event): void => {
+          initialData[event.id] = {
+            count: 0,
+            participants: [],
+            loading: true
+          } satisfies InitialDataEntry;
+        });
+        setParticipantData(initialData);
+
+        // Load participant data progressively (prioritize first 3 events)
+        const priorityEvents = filteredEvents.slice(0, 3);
+        const remainingEvents = filteredEvents.slice(3);
+
+        // Load priority events first (no delay)
+        interface ParticipantPreviewResponse {
+          count: number;
+          participants: Participant[];
+        }
+
+        interface ParticipantDataUpdate {
+          count: number;
+          participants: Participant[];
+          loading: boolean;
+        }
+
+        priorityEvents.forEach(async (event: Event, index: number): Promise<void> => {
+          try {
+            // Small stagger for priority events
+            if (index > 0) {
+              await new Promise<void>(resolve => setTimeout(resolve, index * 50));
+            }
+            
+            const res: Response = await fetch(`/api/events/${event.id}/participants/preview`);
+            if (res.ok) {
+              const data: ParticipantPreviewResponse = await res.json();
+              setParticipantData((prev: Record<string, ParticipantData>) => ({
+          ...prev,
+          [event.id]: {
+            count: data.count || 0,
+            participants: data.participants || [],
+            loading: false
+          }
+              }));
+            } else {
+              setParticipantData((prev: Record<string, ParticipantData>) => ({
+          ...prev,
+          [event.id]: {
+            count: 0,
+            participants: [],
+            loading: false
+          }
+              }));
+            }
+          } catch (error: unknown) {
+            console.error(`Error fetching participant preview for priority event ${event.id}:`, error);
+            setParticipantData((prev: Record<string, ParticipantData>) => ({
+              ...prev,
+              [event.id]: {
+          count: 0,
+          participants: [],
+          loading: false
+              }
+            }));
+          }
+        });
+
+        // Load remaining events with slight delay
+        interface ParticipantPreviewResponse {
+          count: number;
+          participants: Participant[];
+        }
+
+        interface ParticipantDataUpdate {
+          count: number;
+          participants: Participant[];
+          loading: boolean;
+        }
+
+                remainingEvents.forEach(async (event: Event, index: number): Promise<void> => {
+                  try {
+                    // Delay for remaining events to not interfere with priority loading
+                    await new Promise<void>(resolve => setTimeout(resolve, 300 + (index * 100)));
+                    
+                    const res: Response = await fetch(`/api/events/${event.id}/participants/preview`);
+                    if (res.ok) {
+                      const data: ParticipantPreviewResponse = await res.json();
+                      setParticipantData((prev: Record<string, ParticipantData>) => ({
+                        ...prev,
+                        [event.id]: {
+                          count: data.count || 0,
+                          participants: data.participants || [],
+                          loading: false
+                        }
+                      }));
+                    } else {
+                      setParticipantData((prev: Record<string, ParticipantData>) => ({
+                        ...prev,
+                        [event.id]: {
+                          count: 0,
+                          participants: [],
+                          loading: false
+                        }
+                      }));
+                    }
+                  } catch (error: unknown) {
+                    console.error(`Error fetching participant preview for event ${event.id}:`, error);
+                    setParticipantData((prev: Record<string, ParticipantData>) => ({
+                      ...prev,
+                      [event.id]: {
+                        count: 0,
+                        participants: [],
+                        loading: false
+                      }
+                    }));
+                  }
+                });
+
       } catch (error) {
+        console.error('Error fetching events:', error);
         setEvents([]);
         setLoading(false);
       }
     }
-    fetchEvents();
-  }, []);
+    
+    fetchEventsOptimized();
+  }, [showPastEvents]);
 
   // Second useEffect: Fetch participant data after events are loaded
   useEffect(() => {
@@ -280,6 +423,23 @@ export default function Home() {
         <p className="text-gray-600 text-lg">Discover and join amazing events.</p>
       </header>
 
+      {/* Add toggle section */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-gray-800">
+          {showPastEvents ? "Past Events" : "Upcoming Events"}
+        </h2>
+        <Button
+          onClick={() => setShowPastEvents(!showPastEvents)}
+          className={`${
+            showPastEvents 
+              ? "bg-gray-600 hover:bg-gray-700" 
+              : "bg-rose-600 hover:bg-rose-700"
+          } text-white`}
+        >
+          Show {showPastEvents ? "Upcoming" : "Past"} Events
+        </Button>
+      </div>
+
       <section>
         {loading ? (
           <div className="space-y-8">
@@ -297,50 +457,70 @@ export default function Home() {
                 <EventCardSkeleton key={i} />
               ))}
             </div>
-            
-            {/* Additional loading indicators */}
-            <div className="flex justify-center items-center gap-2 py-4">
-              <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-              <div className="w-2 h-2 bg-rose-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            </div>
           </div>
         ) : events.length === 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
               <CalendarIcon className="w-12 h-12 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No events found</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              No {showPastEvents ? "past" : "upcoming"} events found
+            </h3>
             <p className="text-gray-500 max-w-md mx-auto">
-              There are currently no upcoming events available. Check back soon for exciting new events!
+              {showPastEvents 
+                ? "No past events to display. Check back after attending some events!"
+                : "There are currently no upcoming events available. Check back soon for exciting new events!"
+              }
             </p>
           </div>
         ) : (
           <div className="w-full grid grid-cols-1 gap-8">
-            {events.map((event) => {
+            {events.map((event, index) => {
               const eventParticipantData = participantData[event.id];
               const isParticipantLoading = eventParticipantData?.loading !== false;
               
               return (
                 <div
                   key={event.id}
-                  className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72"
+                  className={`w-full bg-white rounded-3xl shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300 group flex flex-col md:flex-row overflow-hidden relative hover:scale-[1.02] h-80 md:h-72 ${
+                    // Add staggered animation for visual appeal
+                    index < 3 ? 'animate-in slide-in-from-bottom-4' : ''
+                  }`}
+                  style={{
+                    // Stagger animation delay for first 3 cards
+                    animationDelay: index < 3 ? `${index * 100}ms` : '0ms'
+                  }}
                 >
+                  {/* Add past event indicator */}
+                  {showPastEvents && (
+                    <div className="absolute top-4 left-4 z-10">
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-300">
+                        Past Event
+                      </span>
+                    </div>
+                  )}
+
                   <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                     {event.image_url ? (
                       <img
                         src={event.image_url}
                         alt={event.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
+                        className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out ${
+                          showPastEvents ? "opacity-75" : ""
+                        }`}
                         onError={(e) => {
                           const img = e.currentTarget;
                           img.onerror = null;
                           img.src = "/placeholder-event.png";
                           img.className = "w-4/5 h-4/5 object-contain opacity-50";
                         }}
+                        // Lazy loading for images after the first 3
+                        loading={index < 3 ? "eager" : "lazy"}
                       />
                     ) : (
-                      <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
+                      <span className={`text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150 ${
+                        showPastEvents ? "opacity-60" : ""
+                      }`}>
                         {event.title.charAt(0)}
                       </span>
                     )}
@@ -349,7 +529,9 @@ export default function Home() {
                   <div className="flex-1 p-8 flex flex-col justify-between bg-gradient-to-br from-white to-gray-50/50 min-h-0">
                     <div className="flex-1 overflow-hidden">
                       <div className="space-y-3">
-                        <h3 className="font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2">
+                        <h3 className={`font-bold text-2xl text-gray-900 group-hover:text-rose-600 transition-colors duration-300 line-clamp-2 ${
+                          showPastEvents ? "text-gray-700" : ""
+                        }`}>
                           {event.title}
                         </h3>
                         <div className="flex flex-wrap items-center gap-2 text-gray-600">
@@ -392,7 +574,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="mt-3 flex justify-between items-end">
-                      {/* Clickable Facepile */}
+                      {/* Clickable Facepile - optimized loading indicator */}
                       <div className="flex-1">
                         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                           <DialogTrigger asChild>
@@ -412,10 +594,10 @@ export default function Home() {
                                     ))}
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                                    <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                    <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                                    <span className="text-sm text-gray-500 ml-1">Loading</span>
+                                    {/* More subtle loading animation */}
+                                    <div className="w-1 h-1 bg-gray-300 rounded-full animate-pulse"></div>
+                                    <div className="w-1 h-1 bg-gray-300 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-1 h-1 bg-gray-300 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                                   </div>
                                 </div>
                               ) : (
@@ -432,7 +614,7 @@ export default function Home() {
                             <DialogHeader>
                               <DialogTitle className="flex items-center gap-2">
                                 <Users className="w-5 h-5 text-rose-500" />
-                                Registered Participants
+                                {showPastEvents ? "Event Participants" : "Registered Participants"}
                                 <span className="text-base text-gray-500 font-normal">
                                   ({selectedEventParticipants.length})
                                 </span>
@@ -442,7 +624,7 @@ export default function Home() {
                               <div className="space-y-3">
                                 {selectedEventParticipants.length === 0 ? (
                                   <p className="text-gray-500 text-center py-4">
-                                    No participants registered yet.
+                                    {showPastEvents ? "No participants found." : "No participants registered yet."}
                                   </p>
                                 ) : (
                                   selectedEventParticipants.map((participant) => (
@@ -483,7 +665,11 @@ export default function Home() {
                       </div>
                       <Link
                         href={`/User/events/${event.id}`}
-                        className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-6 rounded-lg hover:bg-rose-700 transition-colors text-base font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
+                        className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${
+                          showPastEvents 
+                            ? "bg-gray-600 hover:bg-gray-700 text-white shadow-gray-100 hover:shadow-gray-200"
+                            : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100 hover:shadow-rose-200"
+                        }`}
                       >
                         View Details
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
