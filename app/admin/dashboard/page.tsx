@@ -141,7 +141,7 @@ export default function AdminDashboard() {
 
         // Initialize participant data with loading states
         const initialData: Record<string, { count: number; loading: boolean }> = {};
-        filteredEvents.forEach(event => {
+        filteredEvents.forEach((event: Event) => {
           initialData[event.id] = {
             count: 0,
             loading: true
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
         const remainingEvents = filteredEvents.slice(3);
 
         // Load priority events first (no delay)
-        priorityEvents.forEach(async (event, index) => {
+        priorityEvents.forEach(async (event: Event, index: number) => {
           try {
             // Small stagger for priority events
             if (index > 0) {
@@ -193,7 +193,7 @@ export default function AdminDashboard() {
         });
 
         // Load remaining events with slight delay
-        remainingEvents.forEach(async (event, index) => {
+        remainingEvents.forEach(async (event: Event, index: number) => {
           try {
             // Delay for remaining events to not interfere with priority loading
             await new Promise(resolve => setTimeout(resolve, 300 + (index * 100)));
@@ -357,7 +357,7 @@ export default function AdminDashboard() {
     // Load participant counts for new events
     if (filteredEvents.length > 0) {
       const initialData: Record<string, { count: number; loading: boolean }> = {};
-      filteredEvents.forEach(event => {
+      filteredEvents.forEach((event: Event) => {
         initialData[event.id] = {
           count: 0,
           loading: true
@@ -366,9 +366,9 @@ export default function AdminDashboard() {
       setParticipantData(initialData);
 
       // Load all participant counts
-      filteredEvents.forEach(async (event, index) => {
+      filteredEvents.forEach(async (event: Event, index: number) => {
         try {
-          await new Promise(resolve => setTimeout(resolve, index * 50));
+          await new Promise<void>(resolve => setTimeout(resolve, index * 50));
           
           const res = await fetch(`/api/events/${event.id}/participants/preview`);
           if (res.ok) {

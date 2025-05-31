@@ -55,70 +55,88 @@ export default function EventDetailsPage() {
   const [registering, setRegistering] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(true);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
+  // Optimized useEffect: Show event details immediately, load participants after
   useEffect(() => {
-    const initPage = async () => {
+    async function initPageOptimized() {
       try {
-        // Fetch event details
-        if (eventId) {
-          const res = await fetch(`/api/events/${eventId}`);
-          if (res.ok) {
-            const data = await res.json();
-            setEvent(data.event);
-          }
+        setLoading(true);
+        
+        // Start both event and auth checks simultaneously
+        const [eventRes, authRes] = await Promise.all([
+          eventId ? fetch(`/api/events/${eventId}`) : Promise.resolve({ ok: false }),
+          fetch('/api/auth/check')
+        ]);
+
+        // Handle event data first (show immediately)
+        if (eventRes.ok && eventRes instanceof Response) {
+          const eventData = await eventRes.json();
+          setEvent(eventData.event);
         }
+        setLoading(false); // Show event details immediately
 
-        // Check authentication status from the server
-        const authRes = await fetch('/api/auth/check');
+        // Handle auth data
         const authData = await authRes.json();
-
         if (authData.authenticated) {
           setUser(authData.user);
-          // Only check registration if user is authenticated
-          const regRes = await fetch(`/api/registrations/check?event_id=${eventId}`);
-          if (regRes.ok) {
-            const regData = await regRes.json();
-            setRegistered(regData.registered);
+          
+          // Check registration status (non-blocking)
+          if (eventId) {
+            fetch(`/api/registrations/check?event_id=${eventId}`)
+              .then(res => res.ok ? res.json() : { registered: false })
+              .then(regData => setRegistered(regData.registered))
+              .catch(() => setRegistered(false));
           }
 
-          // --- Payment flow fix for post-sign-in ---
+          // Handle payment flow (non-blocking)
           if (typeof window !== 'undefined') {
             const paymentIntent = window.sessionStorage.getItem('register_payment_intent');
             if (paymentIntent === eventId) {
               window.sessionStorage.removeItem('register_payment_intent');
-              if (event?.is_paid && event?.price && !registered) {
-                // Wait for event to be set
-                setTimeout(() => {
+              // Process payment after a short delay to ensure event is loaded
+              setTimeout(() => {
+                if (event?.is_paid && event?.price && !registered) {
                   processPayment();
-                }, 100);
-              }
+                }
+              }, 100);
             }
           }
-          // --- End payment flow fix ---
+        }
+        setCheckingAuth(false);
+
+        // Load participants in background (non-blocking)
+        if (eventId) {
+          setParticipantsLoading(true);
+          // Add a small delay to prioritize main content loading
+          setTimeout(async () => {
+            try {
+              const partRes = await fetch(`/api/events/${eventId}/participants`);
+              if (partRes.ok) {
+                const partData = await partRes.json();
+                setParticipants(partData.participants || []);
+              }
+            } catch (error) {
+              console.error("Error loading participants:", error);
+            } finally {
+              setParticipantsLoading(false);
+            }
+          }, 200);
         } else {
-          setUser(null);
-          setRegistered(false);
+          setParticipantsLoading(false);
         }
 
-        // Fetch participants for this event
-        if (eventId) {
-          const partRes = await fetch(`/api/events/${eventId}/participants`);
-          if (partRes.ok) {
-            const partData = await partRes.json();
-            setParticipants(partData.participants || []);
-          }
-        }
       } catch (error) {
         console.error("Error initializing page:", error);
-      } finally {
-        setCheckingAuth(false);
         setLoading(false);
+        setCheckingAuth(false);
+        setParticipantsLoading(false);
       }
-    };
+    }
 
-    initPage();
+    initPageOptimized();
   }, [eventId]);
 
   async function handleRegister() {
@@ -322,10 +340,39 @@ export default function EventDetailsPage() {
     });
   };
 
+  const handleBackClick = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      router.push('/'); // Fallback to home if no history
+    }
+  };
+
   if (loading) {
     return (
-      <div className="w-full max-w-4xl mx-auto p-6 text-center text-gray-500">
-        Loading event details...
+      <div className="w-full max-w-4xl mx-auto p-6">
+        {/* Back button skeleton */}
+        <div className="mb-6">
+          <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+
+        {/* Event details skeleton */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
+          <div className="w-full h-64 md:h-80 bg-gray-200"></div>
+          <div className="p-6 md:p-8">
+            <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="space-y-4">
+                <div className="h-16 bg-gray-200 rounded"></div>
+                <div className="h-16 bg-gray-200 rounded"></div>
+              </div>
+              <div className="space-y-4">
+                <div className="h-16 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+            <div className="h-12 bg-gray-200 rounded w-48"></div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -342,7 +389,7 @@ export default function EventDetailsPage() {
     <div className="w-full max-w-4xl mx-auto p-6">
       <div className="mb-6">
         <button
-          onClick={() => router.back()}
+          onClick={handleBackClick}
           className="text-rose-600 hover:underline text-sm flex items-center"
         >
           <svg
@@ -498,16 +545,38 @@ export default function EventDetailsPage() {
             )}
           </div>
 
-          {/* Participants Table */}
+          {/* Participants Table - with optimized loading */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-rose-600" />
               Registered Participants
               <span className="ml-2 text-base text-gray-500 font-normal">
-                ({participants.length})
+                {participantsLoading ? (
+                  <span className="inline-flex items-center gap-1">
+                    <div className="w-3 h-3 border border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                    Loading...
+                  </span>
+                ) : (
+                  `(${participants.length})`
+                )}
               </span>
             </h2>
-            {participants.length === 0 ? (
+            
+            {participantsLoading ? (
+              <div className="space-y-3">
+                {/* Participant loading skeletons */}
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg animate-pulse">
+                    <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                    </div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
+                ))}
+              </div>
+            ) : participants.length === 0 ? (
               <div className="text-gray-500">No participants registered yet.</div>
             ) : (
               <div className="overflow-x-auto">
@@ -533,6 +602,7 @@ export default function EventDetailsPage() {
                                 src={p.photo_url}
                                 alt={p.user_name || "Profile"}
                                 className="w-10 h-10 rounded-full object-cover border hover:border-rose-300"
+                                loading="lazy"
                               />
                             </Link>
                           ) : (
