@@ -41,7 +41,17 @@ export async function GET(request: Request) {
         user_linkedin,
         payment_id,
         order_id,
-        amount_paid
+        amount_paid,
+        attended,
+        screening_status,
+        screening_test_id,
+        presentation_status,
+        github_link,
+        deployment_link,
+        presentation_link,
+        presentation_notes,
+        award_type,
+        award_assigned_at
       `)
       .eq('event_id', event_id);
 
@@ -60,6 +70,16 @@ export async function GET(request: Request) {
       payment_id: reg.payment_id,
       order_id: reg.order_id,
       amount_paid: reg.amount_paid,
+      attended: reg.attended,
+      screening_status: reg.screening_status,
+      screening_test_id: reg.screening_test_id,
+      presentation_status: reg.presentation_status,
+      github_link: reg.github_link,
+      deployment_link: reg.deployment_link,
+      presentation_link: reg.presentation_link,
+      presentation_notes: reg.presentation_notes,
+      award_type: reg.award_type,
+      award_assigned_at: reg.award_assigned_at,
       user: {
         name: reg.user_name || 'Unknown',
         email: reg.user_email || 'Unknown',

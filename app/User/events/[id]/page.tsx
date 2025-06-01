@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users } from "lucide-react";
+import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
 
@@ -13,7 +13,8 @@ type Participant = {
   user_name: string | null;
   user_email: string | null;
   user_linkedin?: string | null;
-  photo_url?: string | null; // Add photo_url
+  photo_url?: string | null;
+  award_type?: 'winner' | 'runner_up' | null;
 };
 
 type Event = {
@@ -56,10 +57,13 @@ export default function EventDetailsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(true);
+  const [winners, setWinners] = useState<Participant[]>([]);
+  const [runnersUp, setRunnersUp] = useState<Participant[]>([]);
+  const [winnersLoading, setWinnersLoading] = useState(true);
   const router = useRouter();
   const supabase = createClientComponentClient();
 
-  // Optimized useEffect: Show event details immediately, load participants after
+  // Optimized useEffect: Show event details immediately, load participants and winners after
   useEffect(() => {
     async function initPageOptimized() {
       try {
@@ -128,11 +132,33 @@ export default function EventDetailsPage() {
           setParticipantsLoading(false);
         }
 
+        // Load winners and runners-up
+        if (eventId) {
+          setWinnersLoading(true);
+          setTimeout(async () => {
+            try {
+              const winnersRes = await fetch(`/api/events/${eventId}/winners`);
+              if (winnersRes.ok) {
+                const winnersData = await winnersRes.json();
+                setWinners(winnersData.winners || []);
+                setRunnersUp(winnersData.runnersUp || []);
+              }
+            } catch (error) {
+              console.error("Error loading winners:", error);
+            } finally {
+              setWinnersLoading(false);
+            }
+          }, 300);
+        } else {
+          setWinnersLoading(false);
+        }
+
       } catch (error) {
         console.error("Error initializing page:", error);
         setLoading(false);
         setCheckingAuth(false);
         setParticipantsLoading(false);
+        setWinnersLoading(false);
       }
     }
 
@@ -519,12 +545,21 @@ export default function EventDetailsPage() {
                 Sign in to Register
               </button>
             ) : registered ? (
-              <button
-                className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
-                disabled
-              >
-                Registered
-              </button>
+              <div className="flex gap-3">
+                <button
+                  className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
+                  disabled
+                >
+                  Registered
+                </button>
+                <Link
+                  href={`/User/event-workflow/${eventId}`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                >
+                  Start
+                  <ExternalLink className="w-4 h-4" />
+                </Link>
+              </div>
             ) : (
               <button
                 className={`${
@@ -545,7 +580,123 @@ export default function EventDetailsPage() {
             )}
           </div>
 
-          {/* Participants Table - with optimized loading */}
+          {/* Winners and Runners-up Section - Moved before participants */}
+          {(winners.length > 0 || runnersUp.length > 0) && (
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-yellow-600" />
+                Event Winners
+              </h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Winners */}
+                {winners.length > 0 && (
+                  <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg p-6 border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Trophy className="w-6 h-6 text-yellow-600" />
+                      <h3 className="text-lg font-semibold text-yellow-800">Winner</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {winners.map((winner) => (
+                        <div key={winner.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3">
+                          {winner.photo_url ? (
+                            <Link
+                              href={`/User/profile/${winner.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <img
+                                src={winner.photo_url}
+                                alt={winner.user_name || "Winner"}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-yellow-300"
+                                loading="lazy"
+                              />
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/User/profile/${winner.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-100 text-yellow-600 font-bold text-lg border-2 border-yellow-300">
+                                {winner.user_name?.charAt(0).toUpperCase() || "W"}
+                              </span>
+                            </Link>
+                          )}
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">{winner.user_name || "Unknown Winner"}</p>
+                            <p className="text-sm text-gray-600">{winner.user_email}</p>
+                          </div>
+                          {winner.user_linkedin && (
+                            <a
+                              href={winner.user_linkedin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline text-sm"
+                            >
+                              LinkedIn
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Runners-up */}
+                {runnersUp.length > 0 && (
+                  <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-lg p-6 border border-gray-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Medal className="w-6 h-6 text-gray-600" />
+                      <h3 className="text-lg font-semibold text-gray-800">Runner-up</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {runnersUp.map((runnerUp) => (
+                        <div key={runnerUp.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3">
+                          {runnerUp.photo_url ? (
+                            <Link
+                              href={`/User/profile/${runnerUp.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <img
+                                src={runnerUp.photo_url}
+                                alt={runnerUp.user_name || "Runner-up"}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
+                                loading="lazy"
+                              />
+                            </Link>
+                          ) : (
+                            <Link
+                              href={`/User/profile/${runnerUp.user_id}`}
+                              className="cursor-pointer hover:opacity-80 transition-opacity"
+                            >
+                              <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-600 font-bold text-lg border-2 border-gray-300">
+                                {runnerUp.user_name?.charAt(0).toUpperCase() || "R"}
+                              </span>
+                            </Link>
+                          )}
+                          <div className="flex-1">
+                            <p className="font-semibold text-gray-900">{runnerUp.user_name || "Unknown Runner-up"}</p>
+                            <p className="text-sm text-gray-600">{runnerUp.user_email}</p>
+                          </div>
+                          {runnerUp.user_linkedin && (
+                            <a
+                              href={runnerUp.user_linkedin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline text-sm"
+                            >
+                              LinkedIn
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Participants Table - now shown after winners */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Users className="w-5 h-5 text-rose-600" />
