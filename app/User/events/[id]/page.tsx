@@ -48,11 +48,11 @@ declare global {
 
 export default function EventDetailsPage() {
   const params = useParams();
-  const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  const [event, setEvent] = useState<Event | null>(null);
+  const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [registered, setRegistered] = useState(false);
+  const [attended, setAttended] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -60,8 +60,11 @@ export default function EventDetailsPage() {
   const [winners, setWinners] = useState<Participant[]>([]);
   const [runnersUp, setRunnersUp] = useState<Participant[]>([]);
   const [winnersLoading, setWinnersLoading] = useState(true);
-  const router = useRouter();
-  const supabase = createClientComponentClient();
+  const router = useRouter();  const supabase = createClientComponentClient();
+
+  // Check if event is in the past
+  const isEventPast = event && event.start_date ? 
+    new Date(event.start_date) < new Date() : false;
 
   // Optimized useEffect: Show event details immediately, load participants and winners after
   useEffect(() => {
@@ -86,13 +89,18 @@ export default function EventDetailsPage() {
         const authData = await authRes.json();
         if (authData.authenticated) {
           setUser(authData.user);
-          
-          // Check registration status (non-blocking)
+            // Check registration status (non-blocking)
           if (eventId) {
             fetch(`/api/registrations/check?event_id=${eventId}`)
-              .then(res => res.ok ? res.json() : { registered: false })
-              .then(regData => setRegistered(regData.registered))
-              .catch(() => setRegistered(false));
+              .then(res => res.ok ? res.json() : { registered: false, attended: false })
+              .then(regData => {
+                setRegistered(regData.registered);
+                setAttended(regData.attended || false);
+              })
+              .catch(() => {
+                setRegistered(false);
+                setAttended(false);
+              });
           }
 
           // Handle payment flow (non-blocking)
@@ -504,11 +512,10 @@ export default function EventDetailsPage() {
               ) : (
                 <div className="flex items-start">
                   <Video className="w-5 h-5 text-rose-600 mt-1 mr-3 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-medium text-gray-900">Virtual Event</h3>
+                  <div>                    <h3 className="font-medium text-gray-900">Virtual Event</h3>
                     <p className="text-gray-700">This event will be held online</p>
 
-                    {event.meeting_link && (
+                    {event.meeting_link && !isEventPast && (
                       <a
                         href={event.meeting_link}
                         target="_blank"
@@ -533,52 +540,52 @@ export default function EventDetailsPage() {
                 dangerouslySetInnerHTML={{ __html: event.description }}
               />
             </div>
-          )}
-
-          {/* Registration Button */}
-          <div className="mt-8 mb-8">
-            {!user ? (
-              <button
-                className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${eventId}`)}`)}
-              >
-                Sign in to Register
-              </button>
-            ) : registered ? (
-              <div className="flex gap-3">
+          )}          {/* Registration Button */}
+          {!isEventPast && (
+            <div className="mt-8 mb-8">
+              {!user ? (
                 <button
-                  className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
-                  disabled
+                  className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
+                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${eventId}`)}`)}
                 >
-                  Registered
+                  Sign in to Register
+                </button>              ) : registered ? (
+                <div className="flex gap-3">
+                  <button
+                    className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
+                    disabled
+                  >
+                    Registered
+                  </button>                  {attended && (
+                    <Link
+                      href={`/User/event-workflow/${eventId}`}
+                      className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                    >
+                      Enter Event
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <button
+                  className={`${
+                    event?.is_paid ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
+                  } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
+                    registering ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  onClick={handleRegister}
+                  disabled={registering}
+                >
+                  {registering 
+                    ? "Processing..." 
+                    : event?.is_paid && event?.price
+                      ? `Pay ₹${event.price} & Register`
+                      : "Register for Event"
+                  }
                 </button>
-                <Link
-                  href={`/User/event-workflow/${eventId}`}
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
-                >
-                  Start
-                  <ExternalLink className="w-4 h-4" />
-                </Link>
-              </div>
-            ) : (
-              <button
-                className={`${
-                  event?.is_paid ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
-                } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
-                  registering ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={handleRegister}
-                disabled={registering}
-              >
-                {registering 
-                  ? "Processing..." 
-                  : event?.is_paid && event?.price
-                    ? `Pay ₹${event.price} & Register`
-                    : "Register for Event"
-                }
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Winners and Runners-up Section - Moved before participants */}
           {(winners.length > 0 || runnersUp.length > 0) && (

@@ -23,17 +23,17 @@ export async function GET(request: Request) {
     }
 
     const userId = user.id;
-    
-    // Check if user is registered for this event
+      // Check if user is registered for this event and get attendance status
     const { data, error } = await supabase
       .from('registrations')
-      .select('id')
+      .select('id, attended')
       .eq('user_id', userId)
       .eq('event_id', event_id)
       .single();
 
     return NextResponse.json({ 
       registered: !!data, 
+      attended: data?.attended || false,
       authenticated: true,
       userId: userId
     });
