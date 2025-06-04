@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Github, Linkedin, Mail, Phone, Briefcase, GraduationCap, Code, Trophy } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -119,9 +120,11 @@ export default function UserProfilePage() {
           <div className="absolute -bottom-10 left-8">
             <div className="h-20 w-20 rounded-full border-4 border-white shadow-xl bg-white overflow-hidden">
               {profile.photo_url ? (
-                <img
+                <Image
                   src={profile.photo_url}
                   alt={profile.name}
+                  width={80}
+                  height={80}
                   className="h-full w-full object-cover"
                 />
               ) : (

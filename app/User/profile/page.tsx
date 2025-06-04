@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Pencil, Save, X, UploadCloud } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import Image from "next/image";
 
 type Profile = {
   id: string;
@@ -145,9 +146,11 @@ export default function UserProfile() {
             <div className="relative">
               <div className="h-24 w-24 rounded-full bg-rose-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl">
                 {profile?.photo_url ? (
-                  <img
+                  <Image
                     src={formData.photo_url || profile.photo_url}
                     alt="Profile"
+                    width={96}
+                    height={96}
                     className="h-full w-full object-cover"
                   />
                 ) : (

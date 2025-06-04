@@ -36,6 +36,7 @@ import { v4 as uuidv4 } from "uuid";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Pencil, Trash2 } from "lucide-react"; // Add this import
 import { TiptapEditor } from "@/components/ui/tiptap-editor";
+import Image from "next/image";
 
 type Event = {
   id: string;
@@ -888,10 +889,13 @@ export default function AdminDashboard() {
                       />
                       {imagePreview && (
                         <div className="mt-2">
-                          <img
+                          <Image
                             src={imagePreview}
                             alt="Preview"
-                            className="w-full max-w-md rounded-lg"
+                            width={400}
+                            height={300}
+                            className="w-full max-w-md rounded-lg object-cover"
+                            unoptimized={imagePreview.startsWith('data:')}
                           />
                         </div>
                       )}
@@ -1133,18 +1137,17 @@ export default function AdminDashboard() {
 
                 <div className="md:w-2/5 w-full h-80 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                   {event.image_url ? (
-                    <img
+                    <Image
                       src={event.image_url}
                       alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
+                      fill
+                      className="object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
                       onError={(e) => {
                         const img = e.currentTarget;
                         img.onerror = null;
                         img.src = "/placeholder-event.png";
-                        img.className = "w-4/5 h-4/5 object-contain opacity-50";
                       }}
-                      // Lazy loading for images after the first 3
-                      loading={index < 3 ? "eager" : "lazy"}
+                      priority={index < 3}
                     />
                   ) : (
                     <span className="text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150">
@@ -1557,10 +1560,13 @@ export default function AdminDashboard() {
                       />
                       {imagePreview && (
                         <div className="mt-2">
-                          <img
+                          <Image
                             src={imagePreview}
                             alt="Preview"
-                            className="w-full max-w-md rounded-lg"
+                            width={400}
+                            height={300}
+                            className="w-full max-w-md rounded-lg object-cover"
+                            unoptimized={imagePreview.startsWith('data:')}
                           />
                         </div>
                       )}

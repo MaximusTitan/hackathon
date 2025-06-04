@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 type Registration = {
   id: string;
@@ -81,10 +82,13 @@ export default function UserDashboard() {
             {registrations.map(reg => (
               <div key={reg.id} className="bg-white rounded-lg shadow overflow-hidden">
                 {reg.events.image_url && (
-                  <img
+                  <Image
                     src={reg.events.image_url}
                     alt={reg.events.title}
+                    width={400}
+                    height={192}
                     className="w-full h-48 object-cover"
+                    loading="lazy"
                   />
                 )}
                 <div className="p-4">

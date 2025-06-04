@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
@@ -446,10 +447,13 @@ export default function EventDetailsPage() {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {event.image_url && (
-          <img
+          <Image
             src={event.image_url}
             alt={event.title}
+            width={800}
+            height={320}
             className="w-full h-64 md:h-80 object-cover"
+            priority
           />
         )}
 
@@ -611,9 +615,11 @@ export default function EventDetailsPage() {
                               href={`/User/profile/${winner.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
-                              <img
+                              <Image
                                 src={winner.photo_url}
                                 alt={winner.user_name || "Winner"}
+                                width={48}
+                                height={48}
                                 className="w-12 h-12 rounded-full object-cover border-2 border-yellow-300"
                                 loading="lazy"
                               />
@@ -663,9 +669,11 @@ export default function EventDetailsPage() {
                               href={`/User/profile/${runnerUp.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
-                              <img
+                              <Image
                                 src={runnerUp.photo_url}
                                 alt={runnerUp.user_name || "Runner-up"}
+                                width={48}
+                                height={48}
                                 className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 loading="lazy"
                               />
@@ -756,9 +764,11 @@ export default function EventDetailsPage() {
                               href={`/User/profile/${p.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
-                              <img
+                              <Image
                                 src={p.photo_url}
                                 alt={p.user_name || "Profile"}
+                                width={40}
+                                height={40}
                                 className="w-10 h-10 rounded-full object-cover border hover:border-rose-300"
                                 loading="lazy"
                               />
