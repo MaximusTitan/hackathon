@@ -1,18 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import dynamic from "next/dynamic";
 import { CalendarIcon, MapPin, Clock, Users } from "lucide-react";
 import { Facepile } from "@/components/ui/facepile";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+
+// Lazy load heavy components
+const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.Dialog })), {
+  ssr: false
+});
+const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogContent })), {
+  ssr: false
+});
+const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogHeader })), {
+  ssr: false
+});
+const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogTitle })), {
+  ssr: false
+});
+const DialogTrigger = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogTrigger })), {
+  ssr: false
+});
+const ScrollArea = dynamic(() => import("@/components/ui/scroll-area").then(mod => ({ default: mod.ScrollArea })), {
+  ssr: false
+});
 
 type Participant = {
   id: string;
@@ -62,6 +76,10 @@ export default function Home() {
   
   // Store participant data separately with loading states
   const [participantData, setParticipantData] = useState<Record<string, ParticipantData>>({});
+  
+  // State for managing image loading - images load after event details are shown
+  const [imagesLoaded, setImagesLoaded] = useState<Record<string, boolean>>({});
+  const [showImages, setShowImages] = useState(false);
 
   // Optimized useEffect: Show events immediately, load participants after
   useEffect(() => {
@@ -93,11 +111,14 @@ export default function Home() {
             const dateA = new Date(a.created_at || "");
             const dateB = new Date(b.created_at || "");
             return dateB.getTime() - dateA.getTime();
-          });
-
-        // Show events immediately
+          });        // Show events immediately
         setEvents(filteredEvents);
         setLoading(false);
+
+        // Start loading images after a brief delay to prioritize event details
+        setTimeout(() => {
+          setShowImages(true);
+        }, 300);
 
         // If no events, stop here
         if (filteredEvents.length === 0) {
@@ -235,8 +256,13 @@ export default function Home() {
         setLoading(false);
       }
     }
-    
-    fetchEventsOptimized();
+      fetchEventsOptimized();
+  }, [showPastEvents]);
+
+  // Reset image loading states when showPastEvents changes
+  useEffect(() => {
+    setImagesLoaded({});
+    setShowImages(false);
   }, [showPastEvents]);
 
   // Second useEffect: Fetch participant data after events are loaded
@@ -293,8 +319,15 @@ export default function Home() {
           }
         }));
       }
-    });
-  }, [events]);
+    });  }, [events]);
+
+  // Handle image loading completion
+  const handleImageLoad = useCallback((eventId: string) => {
+    setImagesLoaded(prev => ({
+      ...prev,
+      [eventId]: true
+    }));
+  }, []);
 
   // Format the date display for consistency
   const formatDateRange = (
@@ -498,25 +531,38 @@ export default function Home() {
                         Past Event
                       </span>
                     </div>
-                  )}
-
-                  <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
-                    {event.image_url ? (
-                      <img
-                        src={event.image_url}
-                        alt={event.title}
-                        className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out ${
-                          showPastEvents ? "opacity-75" : ""
-                        }`}
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          img.onerror = null;
-                          img.src = "/placeholder-event.png";
-                          img.className = "w-4/5 h-4/5 object-contain opacity-50";
-                        }}
-                        // Lazy loading for images after the first 3
-                        loading={index < 3 ? "eager" : "lazy"}
-                      />
+                  )}                  <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+                    {event.image_url && showImages ? (
+                      <div className="relative w-full h-full">
+                        {/* Placeholder while image loads */}
+                        {!imagesLoaded[event.id] && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse">
+                            <span className="text-4xl font-bold text-gray-300 select-none">
+                              {event.title.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                        
+                        <Image
+                          src={event.image_url}
+                          alt={event.title}
+                          fill
+                          sizes="(max-width: 768px) 100vw, 40vw"
+                          className={`object-cover group-hover:scale-110 transition-all duration-500 ease-out ${
+                            showPastEvents ? "opacity-75" : ""
+                          } ${
+                            imagesLoaded[event.id] ? "opacity-100" : "opacity-0"
+                          }`}
+                          onLoad={() => handleImageLoad(event.id)}
+                          onError={(e) => {
+                            // Show fallback on error
+                            setImagesLoaded(prev => ({ ...prev, [event.id]: true }));
+                          }}
+                          // Lazy loading for images after the first 3
+                          priority={index < 3}
+                          placeholder="empty"
+                        />
+                      </div>
                     ) : (
                       <span className={`text-8xl font-bold text-gray-200/60 select-none transform -rotate-12 scale-150 ${
                         showPastEvents ? "opacity-60" : ""
@@ -633,13 +679,15 @@ export default function Home() {
                                       href={`/User/profile/${participant.user_id}`}
                                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
                                       onClick={() => setDialogOpen(false)}
-                                    >
-                                      <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0">
+                                    >                                      <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0 relative">
                                         {participant.photo_url ? (
-                                          <img
+                                          <Image
                                             src={participant.photo_url}
                                             alt={participant.user_name || "Profile"}
-                                            className="h-12 w-12 object-cover"
+                                            fill
+                                            sizes="48px"
+                                            className="object-cover"
+                                            placeholder="empty"
                                           />
                                         ) : (
                                           <div className="h-12 w-12 bg-rose-100 flex items-center justify-center text-rose-600 font-semibold">
