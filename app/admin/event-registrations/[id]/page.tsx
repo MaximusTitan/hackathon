@@ -89,10 +89,11 @@ export default function EventRegistrationsPage() {
     deadline: ''
   });
   const [submittingScreening, setSubmittingScreening] = useState(false);
-  const [showAwardDialog, setShowAwardDialog] = useState(false);
-  const [selectedForAward, setSelectedForAward] = useState<string>('');
+  const [showAwardDialog, setShowAwardDialog] = useState(false);  const [selectedForAward, setSelectedForAward] = useState<string>('');
   const [awardType, setAwardType] = useState<'winner' | 'runner_up'>('winner');
   const [assigningAward, setAssigningAward] = useState(false);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [selectedNotes, setSelectedNotes] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -285,7 +286,6 @@ export default function EventRegistrationsPage() {
       setAssigningAward(false);
     }
   };
-
   const handleRemoveAward = async (registrationId: string) => {
     try {
       const res = await fetch('/api/admin/remove-award', {
@@ -312,6 +312,11 @@ export default function EventRegistrationsPage() {
       console.error('Error removing award:', error);
       toast.error('Error removing award');
     }
+  };
+
+  const handleShowNotes = (notes: string) => {
+    setSelectedNotes(notes);
+    setShowNotesDialog(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -768,10 +773,15 @@ export default function EventRegistrationsPage() {
                                   Presentation <ExternalLink className="w-3 h-3" />
                                 </a>
                               </div>
-                            )}
-                            {reg.presentation_notes && (
-                              <div className="text-xs text-gray-600" title={reg.presentation_notes}>
-                                Notes: {reg.presentation_notes.substring(0, 30)}...
+                            )}                            {reg.presentation_notes && (
+                              <div className="text-xs text-gray-600">
+                                <button
+                                  onClick={() => handleShowNotes(reg.presentation_notes!)}
+                                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                                  title="Click to view full notes"
+                                >
+                                  Notes: {reg.presentation_notes.substring(0, 30)}...
+                                </button>
                               </div>
                             )}
                           </div>
@@ -782,11 +792,35 @@ export default function EventRegistrationsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
+              </Table>            </div>
           )}
         </>
       )}
+
+      {/* Notes Dialog */}
+      <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Presentation Notes</DialogTitle>
+            <DialogDescription>
+              Full notes content for the presentation
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 max-h-[60vh] overflow-y-auto">
+            <div className="whitespace-pre-wrap text-sm text-gray-700 p-4 bg-gray-50 rounded-lg">
+              {selectedNotes || "No notes available."}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowNotesDialog(false)}
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
