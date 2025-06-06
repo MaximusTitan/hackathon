@@ -8,6 +8,8 @@ import { CalendarIcon, MapPin, Clock, Users } from "lucide-react";
 import { Facepile } from "@/components/ui/facepile";
 import { Button } from "@/components/ui/button";
 
+import { toast } from "sonner";
+
 // Lazy load heavy components
 const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.Dialog })), {
   ssr: false
@@ -376,7 +378,6 @@ export default function Home() {
     }
     return "Location TBD";
   };
-
   // Fetch full participant list only when dialog is opened
   const handleFacepileClick = async (event: Event) => {
     setDialogOpen(true);
@@ -391,8 +392,7 @@ export default function Home() {
       }
     } catch {
       setSelectedEventParticipants([]);
-    }
-  };
+    }  };
 
   // Loading skeleton component
   const EventCardSkeleton = () => (
@@ -709,21 +709,21 @@ export default function Home() {
                               </div>
                             </ScrollArea>
                           </DialogContent>
-                        </Dialog>
+                        </Dialog>                      </div>                      <div className="flex items-center gap-3">
+                        <Link
+                          href={`/events/${event.id}`}
+                          className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${
+                            showPastEvents 
+                              ? "bg-gray-600 hover:bg-gray-700 text-white shadow-gray-100 hover:shadow-gray-200"
+                              : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100 hover:shadow-rose-200"
+                          }`}
+                        >
+                          View Details
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </Link>
                       </div>
-                      <Link
-                        href={`/User/events/${event.id}`}
-                        className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${
-                          showPastEvents 
-                            ? "bg-gray-600 hover:bg-gray-700 text-white shadow-gray-100 hover:shadow-gray-200"
-                            : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-100 hover:shadow-rose-200"
-                        }`}
-                      >
-                        View Details
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </Link>
                     </div>
                   </div>
                 </div>
