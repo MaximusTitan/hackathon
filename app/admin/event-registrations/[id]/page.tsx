@@ -74,12 +74,17 @@ type ScreeningTest = {
   is_active: boolean;
 };
 
+type Event = {
+  title: string;
+  show_start_button?: boolean;
+};
+
 export default function EventRegistrationsPage() {
   const params = useParams();
   const eventId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
   const [loading, setLoading] = useState(true);
-  const [event, setEvent] = useState<{ title: string } | null>(null);
+  const [event, setEvent] = useState<Event | null>(null);
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
   const [screeningTest, setScreeningTest] = useState<ScreeningTest | null>(null);
   const [showScreeningDialog, setShowScreeningDialog] = useState(false);
@@ -94,6 +99,7 @@ export default function EventRegistrationsPage() {
   const [assigningAward, setAssigningAward] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<string>('');
+  const [updatingStartButton, setUpdatingStartButton] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -351,6 +357,37 @@ export default function EventRegistrationsPage() {
   const winners = registrations.filter(reg => reg.award_type === 'winner');
   const runnersUp = registrations.filter(reg => reg.award_type === 'runner_up');
 
+  const handleToggleStartButton = async () => {
+    if (!event) return;
+    
+    setUpdatingStartButton(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/toggle-start-button`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          show_start_button: !event.show_start_button 
+        })
+      });
+
+      if (res.ok) {
+        setEvent(prev => prev ? { 
+          ...prev, 
+          show_start_button: !prev.show_start_button 
+        } : null);
+        toast.success(`Start button ${!event.show_start_button ? 'enabled' : 'disabled'} successfully`);
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update start button visibility');
+      }
+    } catch (error) {
+      console.error('Error updating start button visibility:', error);
+      toast.error('Error updating start button visibility');
+    } finally {
+      setUpdatingStartButton(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6">
       <Button
@@ -370,6 +407,31 @@ export default function EventRegistrationsPage() {
           Manage registrations, attendance, screening tests, and presentations
         </p>
       </div>
+
+      {/* Event Controls */}
+      {event && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="font-semibold text-gray-900 mb-3">Event Controls</h3>
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={handleToggleStartButton}
+              disabled={updatingStartButton}
+              variant={event.show_start_button ? "default" : "outline"}
+              className={event.show_start_button ? "bg-green-600 hover:bg-green-700 text-white" : "border-gray-600 text-gray-600 hover:bg-gray-100"}
+            >
+              {updatingStartButton ? 'Updating...' : (
+                event.show_start_button ? 'Start Button Enabled' : 'Start Button Disabled'
+              )}
+            </Button>
+            <p className="text-sm text-gray-600">
+              {event.show_start_button 
+                ? 'Participants can see the "Enter Event" button' 
+                : 'The "Enter Event" button is hidden from participants'
+              }
+            </p>
+          </div>
+        </div>
+      )}
       
       {loading ? (
         <div className="text-center py-12">Loading registrations...</div>

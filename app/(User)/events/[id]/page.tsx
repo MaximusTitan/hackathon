@@ -39,6 +39,7 @@ type Event = {
   updated_at?: string | null;
   is_paid?: boolean;
   price?: number;
+  show_start_button?: boolean;
 };
 
 declare global {
@@ -560,7 +561,7 @@ export default function EventDetailsPage() {
                     disabled
                   >
                     Registered
-                  </button>                  {attended && (
+                  </button>                  {attended && event?.show_start_button !== false && (
                     <Link
                       href={`/User/event-workflow/${eventId}`}
                       className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
