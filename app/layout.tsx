@@ -9,8 +9,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Hackathon App",
-  description: "Simple authentication app",
+  title: "Hackon",
+  description: "Discover and join amazing events.",
 };
 
 const geistSans = Geist({
