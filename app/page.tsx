@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { CalendarIcon, MapPin, Clock, Users } from "lucide-react";
+import { CalendarIcon, MapPin, Clock, Users, Share2 } from "lucide-react";
 import { Facepile } from "@/components/ui/facepile";
 import { Button } from "@/components/ui/button";
 
@@ -394,6 +394,18 @@ export default function Home() {
       setSelectedEventParticipants([]);
     }  };
 
+  // Handle event sharing by copying link to clipboard
+  const handleShareEvent = async (event: Event) => {
+    try {
+      const eventUrl = `${window.location.origin}/events/${event.id}`;
+      await navigator.clipboard.writeText(eventUrl);
+      toast.success('Event link copied to clipboard!');
+    } catch (error) {
+      console.error('Share error:', error);
+      toast.error('Failed to copy link. Please try again.');
+    }
+  };
+
   // Loading skeleton component
   const EventCardSkeleton = () => (
     <div className="w-full bg-white rounded-3xl shadow-lg border border-gray-100 flex flex-col md:flex-row overflow-hidden h-80 md:h-72 animate-pulse">
@@ -531,7 +543,18 @@ export default function Home() {
                         Past Event
                       </span>
                     </div>
-                  )}                  <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
+                  )}
+
+                  {/* Share button in top right corner */}
+                  <button
+                    onClick={() => handleShareEvent(event)}
+                    className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg hover:shadow-xl transition-all duration-200 text-gray-700 hover:text-blue-600 backdrop-blur-sm"
+                    title="Share event"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+
+                  <div className="md:w-2/5 w-full h-72 md:h-full relative flex-shrink-0 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center overflow-hidden">
                     {event.image_url && showImages ? (
                       <div className="relative w-full h-full">
                         {/* Placeholder while image loads */}
@@ -709,7 +732,8 @@ export default function Home() {
                               </div>
                             </ScrollArea>
                           </DialogContent>
-                        </Dialog>                      </div>                      <div className="flex items-center gap-3">
+                        </Dialog>                      </div>
+                      <div className="flex items-center gap-3">
                         <Link
                           href={`/events/${event.id}`}
                           className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${

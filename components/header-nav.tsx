@@ -96,7 +96,11 @@ export default function HeaderNav() {
       <nav className="max-w-6xl mx-auto flex items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
           <Link href="/" className="font-bold text-lg text-rose-600">
-            Hackon
+            <img
+              src="https://ygogwzwqvsxataluhhsz.supabase.co/storage/v1/object/public/logo//hack-on-logo.png"
+              alt="Hackon Logo"
+              className="h-4 w-auto"
+            />
           </Link>
           <Link
             href="/"
@@ -106,7 +110,7 @@ export default function HeaderNav() {
           </Link>
           {user && role === "user" && (
             <Link
-              href="/User/dashboard"
+              href="/dashboard"
               className="text-gray-700 hover:text-rose-600 font-medium"
             >
               Registered Events
