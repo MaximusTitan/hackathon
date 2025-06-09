@@ -556,7 +556,7 @@ export default function EventDetailsPage() {
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-rose-600 mb-4">About this event</h2>
               <div 
-                className="prose prose-gray max-w-none text-gray-700"
+                className="prose prose-gray max-w-none text-gray-700 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-6 [&_h1:first-child]:mt-0 [&_h1]:text-gray-800 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2:first-child]:mt-0 [&_h2]:text-gray-800 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3:first-child]:mt-0 [&_h3]:text-gray-800 [&_p]:mb-1 [&_p]:leading-normal [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-2 [&_ul]:space-y-0 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-2 [&_ol]:space-y-0 [&_li]:pl-1 [&_li]:leading-normal [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_br]:block [&_br]:h-1"
                 dangerouslySetInnerHTML={{ __html: event.description }}
               />
             </div>

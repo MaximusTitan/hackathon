@@ -474,6 +474,21 @@ export function AdminEventForm({
                 content={form.description || ""}
                 onChange={(content) => setForm((f: any) => ({ ...f, description: content }))}
                 placeholder="Enter event description..."
+                toolbar={{
+                  bold: true,
+                  italic: true,
+                  underline: true,
+                  bulletList: true,
+                  orderedList: true,
+                  heading: {
+                    h1: true,
+                    h2: true,
+                    h3: true
+                  },
+                  link: true,
+                  undo: true,
+                  redo: true
+                }}
               />
             </div>
 

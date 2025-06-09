@@ -22,6 +22,8 @@
     "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "^2.49.8",
+    "@tiptap/extension-link": "^2.14.0",
+    "@tiptap/extension-underline": "^2.14.0",
     "@tiptap/pm": "^2.1.13",
     "@tiptap/react": "^2.1.13",
     "@tiptap/starter-kit": "^2.12.0",
