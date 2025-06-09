@@ -25,6 +25,9 @@ type Event = {
   price: number;
   razorpay_key_id?: string;
   created_at: string;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 interface AdminEventsListProps {

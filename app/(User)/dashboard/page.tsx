@@ -18,6 +18,9 @@ type Registration = {
     location?: string;
     venue_name?: string;
     image_url?: string;
+    date_tba?: boolean;
+    time_tba?: boolean;
+    venue_tba?: boolean;
   };
 };
 
@@ -90,15 +93,17 @@ export default function UserDashboard() {
                     className="w-full h-48 object-cover"
                     loading="lazy"
                   />
-                )}
-                <div className="p-4">
+                )}                <div className="p-4">
                   <h3 className="font-semibold text-lg mb-2">{reg.events.title}</h3>
                   <div className="space-y-2 text-sm text-gray-600">
-                    <p>Event Date: {formatDate(reg.events.start_date)}</p>
-                    {reg.events.start_time && (
+                    <p>Event Date: {reg.events.date_tba ? 'Date TBA' : formatDate(reg.events.start_date)}</p>
+                    {!reg.events.time_tba && reg.events.start_time && (
                       <p>Time: {reg.events.start_time} - {reg.events.end_time}</p>
                     )}
-                    <p>Location: {reg.events.venue_name || reg.events.location}</p>
+                    {reg.events.time_tba && (
+                      <p>Time: Time TBA</p>
+                    )}
+                    <p>Location: {reg.events.venue_tba ? 'Venue TBA' : (reg.events.venue_name || reg.events.location)}</p>
                     <p className="text-xs">Registered on: {formatDate(reg.registered_at)}</p>
                   </div>
                   <div className="mt-4">

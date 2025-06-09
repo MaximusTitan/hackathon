@@ -45,14 +45,34 @@ export async function PUT(
     
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    }    // Prepare update data with proper handling for TBA fields
+    const processedUpdateData = {
+      ...body,
+      updated_at: new Date().toISOString(),
+      
+      // Handle TBA fields - set to NULL if TBA is true or if value is empty string
+      start_date: body.date_tba || !body.start_date ? null : body.start_date,
+      end_date: body.date_tba || !body.end_date ? null : body.end_date,
+      start_time: body.time_tba || !body.start_time ? null : body.start_time,
+      end_time: body.time_tba || !body.end_time ? null : body.end_time,
+      
+      // Venue/location fields
+      venue_name: body.venue_tba || !body.venue_name ? null : body.venue_name,
+      address_line1: body.venue_tba || !body.address_line1 ? null : body.address_line1,
+      city: body.venue_tba || !body.city ? null : body.city,
+      postal_code: body.venue_tba || !body.postal_code ? null : body.postal_code,
+      location: body.venue_tba || !body.location ? null : body.location,
+      location_link: body.venue_tba || !body.location_link ? null : body.location_link,
+      
+      // Ensure TBA fields are boolean if they exist
+      ...(body.hasOwnProperty('date_tba') && { date_tba: !!body.date_tba }),
+      ...(body.hasOwnProperty('time_tba') && { time_tba: !!body.time_tba }),
+      ...(body.hasOwnProperty('venue_tba') && { venue_tba: !!body.venue_tba }),
+    };
 
     const { error } = await supabase
       .from("events")
-      .update({
-        ...body,
-        updated_at: new Date().toISOString(),
-      })
+      .update(processedUpdateData)
       .eq("id", id);
 
     if (error) {

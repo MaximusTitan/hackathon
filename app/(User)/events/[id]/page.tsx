@@ -40,6 +40,9 @@ type Event = {
   is_paid?: boolean;
   price?: number;
   show_start_button?: boolean;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 declare global {
@@ -462,55 +465,67 @@ export default function EventDetailsPage() {
           <h1 className="text-3xl font-bold text-gray-800 mb-4">{event.title} <span className="text-rose-600 font-bold">| Hackon</span></h1>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="space-y-4">
-              <div className="flex items-start">
+            <div className="space-y-4">              <div className="flex items-start">
                 <CalendarIcon className="w-5 h-5 text-rose-600 mt-1 mr-3 flex-shrink-0" />
                 <div>
                   <h3 className="font-medium text-gray-900">Date</h3>
                   <p className="text-gray-700">
-                    {formatDate(event.start_date)}
-                    {event.end_date && event.start_date !== event.end_date && (
+                    {event.date_tba ? (
+                      <span className="text-blue-600 font-medium">Date To Be Announced</span>
+                    ) : (
                       <>
-                        <br />
-                        <span>to {formatDate(event.end_date)}</span>
+                        {formatDate(event.start_date)}
+                        {event.end_date && event.start_date !== event.end_date && (
+                          <>
+                            <br />
+                            <span>to {formatDate(event.end_date)}</span>
+                          </>
+                        )}
                       </>
                     )}
                   </p>
                 </div>
-              </div>
-
-              {(event.start_time || event.end_time) && (
+              </div>{(event.start_time || event.end_time || event.time_tba) && (
                 <div className="flex items-start">
                   <Clock className="w-5 h-5 text-rose-600 mt-1 mr-3 flex-shrink-0" />
                   <div>
                     <h3 className="font-medium text-gray-900">Time</h3>
                     <p className="text-gray-700">
-                      {event.start_time ? event.start_time : "TBD"}
-                      {event.end_time && ` - ${event.end_time}`}
+                      {event.time_tba ? (
+                        <span className="text-blue-600 font-medium">To Be Announced</span>
+                      ) : (
+                        <>
+                          {event.start_time ? event.start_time : "TBD"}
+                          {event.end_time && ` - ${event.end_time}`}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="space-y-4">
+            </div>            <div className="space-y-4">
               {event.event_type === "offline" ? (
                 <div className="flex items-start">
                   <MapPin className="w-5 h-5 text-rose-600 mt-1 mr-3 flex-shrink-0" />
                   <div>
                     <h3 className="font-medium text-gray-900">Location</h3>
-                    <p className="text-gray-700">{getFullAddress()}</p>
-
-                    {event.location_link && (
-                      <a
-                        href={event.location_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-rose-600 hover:underline inline-flex items-center text-sm mt-1"
-                      >
-                        View on map
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </a>
+                    {event.venue_tba ? (
+                      <p className="text-blue-600 font-medium">Venue To Be Announced</p>
+                    ) : (
+                      <>
+                        <p className="text-gray-700">{getFullAddress()}</p>
+                        {event.location_link && (
+                          <a
+                            href={event.location_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-rose-600 hover:underline inline-flex items-center text-sm mt-1"
+                          >
+                            View on map
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </a>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

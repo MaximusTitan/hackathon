@@ -78,17 +78,35 @@ export async function POST(request: Request) {
     
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
+    }    // Prepare event data with proper handling for TBA fields
+    const processedEventData = {
+      ...eventData,
+      is_public: eventData.is_public ?? true,
+      is_paid: eventData.is_paid || false,
+      price: eventData.price || 0,
+      razorpay_key_id: eventData.razorpay_key_id || null,
+      
+      // Handle TBA fields - set to NULL if TBA is true or if value is empty string
+      start_date: eventData.date_tba || !eventData.start_date ? null : eventData.start_date,
+      end_date: eventData.date_tba || !eventData.end_date ? null : eventData.end_date,
+      start_time: eventData.time_tba || !eventData.start_time ? null : eventData.start_time,
+      end_time: eventData.time_tba || !eventData.end_time ? null : eventData.end_time,
+      
+      // Venue/location fields
+      venue_name: eventData.venue_tba || !eventData.venue_name ? null : eventData.venue_name,
+      address_line1: eventData.venue_tba || !eventData.address_line1 ? null : eventData.address_line1,
+      city: eventData.venue_tba || !eventData.city ? null : eventData.city,
+      postal_code: eventData.venue_tba || !eventData.postal_code ? null : eventData.postal_code,
+      location: eventData.venue_tba || !eventData.location ? null : eventData.location,
+      location_link: eventData.venue_tba || !eventData.location_link ? null : eventData.location_link,
+      
+      // Ensure TBA fields are boolean
+      date_tba: !!eventData.date_tba,
+      time_tba: !!eventData.time_tba,
+      venue_tba: !!eventData.venue_tba,
+    };
 
-    const { error } = await supabase.from("events").insert([
-      {
-        ...eventData,
-        is_public: eventData.is_public ?? true,
-        is_paid: eventData.is_paid || false,
-        price: eventData.price || 0,
-        razorpay_key_id: eventData.razorpay_key_id || null,
-      },
-    ]);
+    const { error } = await supabase.from("events").insert([processedEventData]);
 
     if (error) {
       console.error("Error creating event:", error);

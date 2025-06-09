@@ -77,6 +77,9 @@ type ScreeningTest = {
 type Event = {
   title: string;
   show_start_button?: boolean;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 export default function EventRegistrationsPage() {

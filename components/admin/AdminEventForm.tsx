@@ -53,6 +53,8 @@ type Event = {
   price: number;
   razorpay_key_id?: string;
   created_at: string;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 interface AdminEventFormProps {
@@ -76,6 +78,9 @@ interface AdminEventFormProps {
     is_paid: boolean;
     price: number;
     razorpay_key_id: string;
+    date_tba: boolean;
+    time_tba: boolean;
+    venue_tba: boolean;
   };
   setForm: (form: any) => void;
   startDateObj: Date | undefined;
@@ -170,122 +175,154 @@ export function AdminEventForm({
                 onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))}
                 required
                 className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
+              />            </div>
+
+            {/* Date TBA Toggle */}
+            <div className="flex items-center gap-3 mb-4">
+              <Switch
+                checked={form.date_tba}
+                onCheckedChange={(checked) => setForm((f: any) => ({ ...f, date_tba: checked }))}
               />
+              <Label className="text-gray-700 font-medium">
+                Date To Be Announced (TBA)
+              </Label>
             </div>
 
-            {/* Date Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Start Date */}
-              <div className="grid gap-2">
-                <Label className="text-gray-700">Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
-                        !startDateObj && "text-gray-500"
-                      )}
-                      type="button"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                      {startDateObj
-                        ? format(startDateObj, "PPP")
-                        : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDateObj}
-                      onSelect={(d) => {
-                        setStartDateObj(d);
-                        setForm((f: any) => ({
-                          ...f,
-                          start_date: d ? d.toISOString().slice(0, 10) : "",
-                        }));
-                      }}
-                      initialFocus
-                      className="bg-white text-gray-900"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              
-              {/* End Date */}
-              <div className="grid gap-2">
-                <Label className="text-gray-700">End Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
-                        !endDateObj && "text-gray-500"
-                      )}
-                      type="button"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                      {endDateObj
-                        ? format(endDateObj, "PPP")
-                        : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 bg-white" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={endDateObj}
-                      onSelect={(d) => {
-                        setEndDateObj(d);
-                        setForm((f: any) => ({
-                          ...f,
-                          end_date: d ? d.toISOString().slice(0, 10) : "",
-                        }));
-                      }}
-                      initialFocus
-                      className="bg-white text-gray-900"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Time Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="start_time" className="text-gray-700">
-                  Start Time
-                </Label>
-                <div className="flex items-center">
-                  <Clock className="mr-2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="start_time"
-                    type="time"
-                    value={form.start_time}
-                    onChange={(e) => setForm((f: any) => ({ ...f, start_time: e.target.value }))}
-                    required
-                    className="border-gray-200 text-gray-900 bg-white"
-                  />
+            {/* Date Fields - Only show if not TBA */}
+            {!form.date_tba ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Start Date */}
+                <div className="grid gap-2">
+                  <Label className="text-gray-700">Start Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
+                          !startDateObj && "text-gray-500"
+                        )}
+                        type="button"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                        {startDateObj
+                          ? format(startDateObj, "PPP")
+                          : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDateObj}
+                        onSelect={(d) => {
+                          setStartDateObj(d);
+                          setForm((f: any) => ({
+                            ...f,
+                            start_date: d ? d.toISOString().slice(0, 10) : "",
+                          }));
+                        }}
+                        initialFocus
+                        className="bg-white text-gray-900"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                {/* End Date */}
+                <div className="grid gap-2">
+                  <Label className="text-gray-700">End Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal bg-white border-gray-200 text-gray-800",
+                          !endDateObj && "text-gray-500"
+                        )}
+                        type="button"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                        {endDateObj
+                          ? format(endDateObj, "PPP")
+                          : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDateObj}
+                        onSelect={(d) => {
+                          setEndDateObj(d);
+                          setForm((f: any) => ({
+                            ...f,
+                            end_date: d ? d.toISOString().slice(0, 10) : "",
+                          }));
+                        }}
+                        initialFocus
+                        className="bg-white text-gray-900"
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-
+            ) : (
               <div className="grid gap-2">
-                <Label htmlFor="end_time" className="text-gray-700">
-                  End Time
-                </Label>
-                <div className="flex items-center">
-                  <Clock className="mr-2 h-4 w-4 text-gray-500" />
-                  <Input
-                    id="end_time"
-                    type="time"
-                    value={form.end_time}
-                    onChange={(e) => setForm((f: any) => ({ ...f, end_time: e.target.value }))}
-                    required
-                    className="border-gray-200 text-gray-900 bg-white"
-                  />
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-blue-800 font-medium">📅 Event date will be announced later</p>
+                  <p className="text-blue-600 text-sm mt-1">Event attendees will be notified once the date is confirmed.</p>
                 </div>
               </div>
+            )}
+
+            {/* Time TBA Toggle */}
+            <div className="flex items-center gap-3 mb-4">
+              <Switch
+                checked={form.time_tba}
+                onCheckedChange={(checked) => setForm((f: any) => ({ ...f, time_tba: checked }))}
+              />
+              <Label className="text-gray-700 font-medium">
+                Time To Be Announced (TBA)
+              </Label>
             </div>
+
+            {/* Time Fields - Only show if not TBA */}
+            {!form.time_tba && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="start_time" className="text-gray-700">
+                    Start Time
+                  </Label>
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-500" />
+                    <Input
+                      id="start_time"
+                      type="time"
+                      value={form.start_time}
+                      onChange={(e) => setForm((f: any) => ({ ...f, start_time: e.target.value }))}
+                      required={!form.time_tba}
+                      className="border-gray-200 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="end_time" className="text-gray-700">
+                    End Time
+                  </Label>
+                  <div className="flex items-center">
+                    <Clock className="mr-2 h-4 w-4 text-gray-500" />
+                    <Input
+                      id="end_time"
+                      type="time"
+                      value={form.end_time}
+                      onChange={(e) => setForm((f: any) => ({ ...f, end_time: e.target.value }))}
+                      required={!form.time_tba}
+                      className="border-gray-200 text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Event Type */}
             <div className="grid gap-2">
@@ -303,8 +340,20 @@ export function AdminEventForm({
                   <SelectItem value="offline">Offline</SelectItem>
                   <SelectItem value="virtual">Virtual</SelectItem>
                 </SelectContent>
-              </Select>
-            </div>
+              </Select>            </div>
+
+            {/* Venue TBA Toggle - Only show for offline events */}
+            {form.event_type === "offline" && (
+              <div className="flex items-center gap-3 mb-4">
+                <Switch
+                  checked={form.venue_tba}
+                  onCheckedChange={(checked) => setForm((f: any) => ({ ...f, venue_tba: checked }))}
+                />
+                <Label className="text-gray-700 font-medium">
+                  Venue To Be Announced (TBA)
+                </Label>
+              </div>
+            )}
 
             {/* Conditional Location/Meeting Fields */}
             {form.event_type === "virtual" ? (
@@ -321,7 +370,7 @@ export function AdminEventForm({
                   className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                 />
               </div>
-            ) : (
+            ) : !form.venue_tba ? (
               <div className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="venue_name" className="text-gray-700">
@@ -332,7 +381,7 @@ export function AdminEventForm({
                     placeholder="Enter venue name"
                     value={form.venue_name}
                     onChange={(e) => setForm((f: any) => ({ ...f, venue_name: e.target.value }))}
-                    required
+                    required={!form.venue_tba}
                     className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                   />
                 </div>
@@ -346,7 +395,7 @@ export function AdminEventForm({
                     placeholder="Enter street address"
                     value={form.address_line1}
                     onChange={(e) => setForm((f: any) => ({ ...f, address_line1: e.target.value }))}
-                    required
+                    required={!form.venue_tba}
                     className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                   />
                 </div>
@@ -361,7 +410,7 @@ export function AdminEventForm({
                       placeholder="Enter city"
                       value={form.city}
                       onChange={(e) => setForm((f: any) => ({ ...f, city: e.target.value }))}
-                      required
+                      required={!form.venue_tba}
                       className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                     />
                   </div>
@@ -389,7 +438,7 @@ export function AdminEventForm({
                     placeholder="How location should display to users"
                     value={form.location}
                     onChange={(e) => setForm((f: any) => ({ ...f, location: e.target.value }))}
-                    required
+                    required={!form.venue_tba}
                     className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                   />
                 </div>
@@ -405,6 +454,13 @@ export function AdminEventForm({
                     onChange={(e) => setForm((f: any) => ({ ...f, location_link: e.target.value }))}
                     className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
                   />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-blue-800 font-medium">📍 Venue details will be announced later</p>
+                  <p className="text-blue-600 text-sm mt-1">Event attendees will be notified once venue information is available.</p>
                 </div>
               </div>
             )}

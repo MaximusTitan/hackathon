@@ -32,13 +32,15 @@ type Event = {
   price: number;
   razorpay_key_id?: string;
   created_at: string;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 export default function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPastEvents, setShowPastEvents] = useState(false);
-  const [form, setForm] = useState({
+  const [showPastEvents, setShowPastEvents] = useState(false);  const [form, setForm] = useState({
     title: "",
     description: "",
     start_date: "",
@@ -58,6 +60,9 @@ export default function AdminDashboard() {
     is_paid: false,
     price: 0,
     razorpay_key_id: "",
+    date_tba: false,
+    time_tba: false,
+    venue_tba: false,
   });
   const [creating, setCreating] = useState(false);
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -71,8 +76,7 @@ export default function AdminDashboard() {
   const [participantData, setParticipantData] = useState<Record<string, { count: number; loading: boolean }>>({});
   const supabase = createClientComponentClient();
 
-  useEffect(() => {
-    async function fetchEventsOptimized() {
+  useEffect(() => {    async function fetchEventsOptimized() {
       try {
         setLoading(true);
         
@@ -85,11 +89,16 @@ export default function AdminDashboard() {
         
         // Split events into upcoming and past
         const { upcoming, past } = allEvents.reduce((acc: { upcoming: Event[], past: Event[] }, event: Event) => {
-          const eventDate = new Date(event.start_date || "");
-          if (eventDate >= currentDate) {
+          // If any date field is TBA, treat as upcoming event
+          if (event.date_tba || event.time_tba || event.venue_tba) {
             acc.upcoming.push(event);
           } else {
-            acc.past.push(event);
+            const eventDate = new Date(event.start_date || "");
+            if (eventDate >= currentDate) {
+              acc.upcoming.push(event);
+            } else {
+              acc.past.push(event);
+            }
           }
           return acc;
         }, { upcoming: [], past: [] });
@@ -297,7 +306,6 @@ export default function AdminDashboard() {
       setUploading(false);
     }
   }
-
   const fetchEvents = async () => {
     const res = await fetch("/api/events");
     const data = await res.json();
@@ -307,11 +315,16 @@ export default function AdminDashboard() {
     
     // Split events into upcoming and past
     const { upcoming, past } = allEvents.reduce((acc: { upcoming: Event[], past: Event[] }, event: Event) => {
-      const eventDate = new Date(event.start_date || "");
-      if (eventDate >= currentDate) {
+      // If any date field is TBA, treat as upcoming event
+      if (event.date_tba || event.time_tba || event.venue_tba) {
         acc.upcoming.push(event);
       } else {
-        acc.past.push(event);
+        const eventDate = new Date(event.start_date || "");
+        if (eventDate >= currentDate) {
+          acc.upcoming.push(event);
+        } else {
+          acc.past.push(event);
+        }
       }
       return acc;
     }, { upcoming: [], past: [] });
@@ -422,8 +435,7 @@ export default function AdminDashboard() {
   const startEditing = (event: Event) => {
     // Scroll to top of the page
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    setForm({
+      setForm({
       title: event.title,
       description: event.description || "",
       start_date: event.start_date || "",
@@ -443,6 +455,9 @@ export default function AdminDashboard() {
       is_paid: event.is_paid,
       price: event.price,
       razorpay_key_id: event.razorpay_key_id || "",
+      date_tba: event.date_tba || false,
+      time_tba: event.time_tba || false,
+      venue_tba: event.venue_tba || false,
     });
     setStartDateObj(event.start_date ? new Date(event.start_date) : undefined);
     setEndDateObj(event.end_date ? new Date(event.end_date) : undefined);
@@ -450,7 +465,6 @@ export default function AdminDashboard() {
     setIsEditing(true);
     setShowCreate(true); // Make sure the form is visible
   };
-
   // Add this new function to reset the form
   const resetForm = () => {
     setForm({
@@ -473,6 +487,9 @@ export default function AdminDashboard() {
       is_paid: false,
       price: 0,
       razorpay_key_id: "",
+      date_tba: false,
+      time_tba: false,
+      venue_tba: false,
     });
     setStartDateObj(undefined);
     setEndDateObj(undefined);

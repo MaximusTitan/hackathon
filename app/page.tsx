@@ -61,6 +61,9 @@ type Event = {
   is_public: boolean;
   participant_count?: number;
   participants?: Participant[];
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 type ParticipantData = {
@@ -96,12 +99,15 @@ export default function Home() {
           data = await res.json();
         } catch (err) {
           data = {};
-        }
-
-        // Filter and sort events
+        }        // Filter and sort events
         const currentDate = new Date();
         const filteredEvents = (data.events || [])
           .filter((event: Event) => {
+            // If any TBA field is true, treat as upcoming event
+            if (event.date_tba || event.time_tba || event.venue_tba) {
+              return !showPastEvents; // Show in upcoming, not in past
+            }
+            
             const eventDate = new Date(event.start_date || "");
             if (showPastEvents) {
               return eventDate < currentDate;
@@ -603,30 +609,36 @@ export default function Home() {
                         }`}>
                           {event.title}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-2 text-gray-600">
-                          <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                        <div className="flex flex-wrap items-center gap-2 text-gray-600">                          <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                             <CalendarIcon className="w-4 h-4 text-rose-500" />
                             <span className="text-sm">
-                              {event.start_date}
-                              {event.end_date && event.end_date !== event.start_date && (
-                                <span> - {event.end_date}</span>
+                              {event.date_tba ? "Date TBA" : (
+                                <>
+                                  {event.start_date}
+                                  {event.end_date && event.end_date !== event.start_date && (
+                                    <span> - {event.end_date}</span>
+                                  )}
+                                </>
                               )}
                             </span>
-                          </span>
-                          <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                          </span><span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                             <Clock className="w-4 h-4 text-rose-500" />
                             <span className="text-sm">
-                              {event.start_time} - {event.end_time}
+                              {event.time_tba ? "Time TBA" : `${event.start_time} - ${event.end_time}`}
                             </span>
                           </span>
                         </div>
 
                         {/* Location on separate line */}
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+                        <div className="flex items-center gap-2 text-gray-600">                          <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
                             <MapPin className="w-4 h-4 text-rose-500" />
                             <span className="text-sm">
-                              {event.event_type === "virtual" ? "Virtual Event" : event.location}
+                              {event.event_type === "virtual" 
+                                ? "Virtual Event" 
+                                : event.venue_tba 
+                                  ? "Venue TBA" 
+                                  : event.location
+                              }
                             </span>
                           </span>
                         </div>

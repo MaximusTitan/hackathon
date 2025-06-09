@@ -30,6 +30,9 @@ type Event = {
   price: number;
   razorpay_key_id?: string;
   created_at: string;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
 
 interface AdminEventCardProps {
@@ -199,30 +202,35 @@ export function AdminEventCard({
             </span>
           </div>
           
-          {/* Date and Time */}
-          <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-3">
+          {/* Date and Time */}          <div className="flex flex-wrap items-center gap-2 text-gray-600 mb-3">
             <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
               <CalendarIcon className="w-4 h-4 text-rose-500" />
               <span className="text-sm">
-                {event.start_date}
-                {event.end_date && event.end_date !== event.start_date && (
-                  <span> - {event.end_date}</span>
+                {event.date_tba ? "Date TBA" : (
+                  <>
+                    {event.start_date}
+                    {event.end_date && event.end_date !== event.start_date && (
+                      <span> - {event.end_date}</span>
+                    )}
+                  </>
                 )}
               </span>
-            </span>
-            <span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+            </span><span className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
               <Clock className="w-4 h-4 text-rose-500" />
               <span className="text-sm">
-                {event.start_time} - {event.end_time}
+                {event.time_tba ? "Time TBA" : `${event.start_time} - ${event.end_time}`}
               </span>
             </span>
-          </div>
-
-          {/* Location */}
+          </div>          {/* Location */}
           <div className="flex items-center gap-2 text-gray-600 mb-2">
             <MapPin className="w-4 h-4 text-rose-500" />
             <span className="text-sm">
-              {event.event_type === "virtual" ? "Virtual Event" : event.location}
+              {event.event_type === "virtual" 
+                ? "Virtual Event" 
+                : event.venue_tba 
+                  ? "Venue TBA" 
+                  : event.location
+              }
             </span>
           </div>
 

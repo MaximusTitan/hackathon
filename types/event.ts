@@ -18,4 +18,7 @@ export type Event = {
   created_at?: string | null;
   updated_at?: string | null;
   is_public: boolean;
+  date_tba?: boolean;
+  time_tba?: boolean;
+  venue_tba?: boolean;
 };
