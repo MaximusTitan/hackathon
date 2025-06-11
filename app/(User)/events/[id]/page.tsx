@@ -7,6 +7,7 @@ import Image from "next/image";
 import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
+import PastEventGallery from "@/components/PastEventGallery";
 
 type Participant = {
   id: string;
@@ -65,6 +66,7 @@ export default function EventDetailsPage() {
   const [winners, setWinners] = useState<Participant[]>([]);
   const [runnersUp, setRunnersUp] = useState<Participant[]>([]);
   const [winnersLoading, setWinnersLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();  const supabase = createClientComponentClient();
 
   // Check if event is in the past
@@ -94,7 +96,9 @@ export default function EventDetailsPage() {
         const authData = await authRes.json();
         if (authData.authenticated) {
           setUser(authData.user);
-            // Check registration status (non-blocking)
+          // Check if user is admin
+          setIsAdmin(authData.user?.user_metadata?.role === 'admin' || authData.user?.email === 'admin@hackon.com');
+          // Check registration status (non-blocking)
           if (eventId) {
             fetch(`/api/registrations/check?event_id=${eventId}`)
               .then(res => res.ok ? res.json() : { registered: false, attended: false })
@@ -397,7 +401,7 @@ export default function EventDetailsPage() {
 
         {/* Event details skeleton */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
-          <div className="w-full h-64 md:h-80 bg-gray-200"></div>
+          <div className="w-full h-80 md:h-96 lg:h-[500px] bg-gray-200"></div>
           <div className="p-6 md:p-8">
             <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -451,14 +455,16 @@ export default function EventDetailsPage() {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {event.image_url && (
-          <Image
-            src={event.image_url}
-            alt={event.title}
-            width={800}
-            height={320}
-            className="w-full h-64 md:h-80 object-cover"
-            priority
-          />
+          <div className="relative w-full h-80 md:h-96 lg:h-[500px]">
+            <Image
+              src={event.image_url}
+              alt={event.title}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 1200px"
+            />
+          </div>
         )}
 
         <div className="p-6 md:p-8">
@@ -606,6 +612,9 @@ export default function EventDetailsPage() {
               )}
             </div>
           )}
+
+          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
+          <PastEventGallery eventId={eventId || ""} isAdmin={isAdmin} />
 
           {/* Winners and Runners-up Section - Moved before participants */}
           {(winners.length > 0 || runnersUp.length > 0) && (

@@ -99,7 +99,7 @@ export default function HeaderNav() {
             <img
               src="https://ygogwzwqvsxataluhhsz.supabase.co/storage/v1/object/public/logo//hack-on-logo.png"
               alt="Hackon Logo"
-              className="h-4 w-auto"
+              className="h-6 w-auto"
             />
           </Link>
           <Link
