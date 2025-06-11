@@ -54,7 +54,8 @@ declare global {
 
 export default function EventDetailsPage() {
   const params = useParams();
-  const eventParam = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const eventTitle = Array.isArray(params?.title) ? params.title[0] : params?.title;
+  
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -74,27 +75,15 @@ export default function EventDetailsPage() {
   const isEventPast = event && event.start_date ? 
     new Date(event.start_date) < new Date() : false;
 
-  // Function to determine if param is an ID (UUID) or title slug
-  const isUUID = (str: string) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(str);
-  };
-
   // Optimized useEffect: Show event details immediately, load participants and winners after
   useEffect(() => {
     async function initPageOptimized() {
       try {
         setLoading(true);
         
-        // Determine API endpoint based on parameter type
-        const isId = eventParam && isUUID(eventParam);
-        const apiEndpoint = isId 
-          ? `/api/events/${eventParam}` 
-          : `/api/events/by-title/${encodeURIComponent(eventParam || '')}`;
-        
         // Start both event and auth checks simultaneously
         const [eventRes, authRes] = await Promise.all([
-          eventParam ? fetch(apiEndpoint) : Promise.resolve({ ok: false }),
+          eventTitle ? fetch(`/api/events/${encodeURIComponent(eventTitle)}`) : Promise.resolve({ ok: false }),
           fetch('/api/auth/check')
         ]);
 
@@ -193,7 +182,7 @@ export default function EventDetailsPage() {
     }
 
     initPageOptimized();
-  }, [eventParam, event?.id]);
+  }, [eventTitle, event?.id]);
 
   async function handleRegister() {
     try {
@@ -204,7 +193,7 @@ export default function EventDetailsPage() {
       const safeEventId = event?.id || "";
 
       if (!authData.authenticated) {
-        const returnUrl = `/User/events/${eventParam}`;
+        const returnUrl = `/User/events/${encodeURIComponent(eventTitle || "")}`;
         // --- Store payment intent if paid event ---
         if (event?.is_paid && event?.price && event.price > 0 && typeof window !== 'undefined') {
           window.sessionStorage.setItem('register_payment_intent', safeEventId);
@@ -377,11 +366,10 @@ export default function EventDetailsPage() {
     const parts = [];
     if (event.venue_name) parts.push(event.venue_name);
     if (event.address_line1) parts.push(event.address_line1);
-    const cityPostal = [];
-    if (event.city) cityPostal.push(event.city);
-    if (event.postal_code) cityPostal.push(event.postal_code);
-    if (cityPostal.length > 0) {
-      parts.push(cityPostal.join(" "));
+    const cityPart = event.city ? `, ${event.city}` : "";
+    const postalPart = event.postal_code ? ` ${event.postal_code}` : "";
+    if (cityPart || postalPart) {
+      parts.push(`${cityPart}${postalPart}`);
     }
     return parts.length > 0 ? parts.join(", ") : event.location || "Location TBD";
   };
@@ -389,7 +377,6 @@ export default function EventDetailsPage() {
   const formatDate = (date: string | null) => {
     if (!date) return "";
     return new Date(date).toLocaleDateString("en-US", {
-      weekday: "long",
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -494,7 +481,7 @@ export default function EventDetailsPage() {
                     ) : (
                       <>
                         {formatDate(event.start_date)}
-                        {event.end_date && event.start_date !== event.end_date && (
+                        {event.end_date && event.end_date !== event.start_date && (
                           <>
                             <br />
                             <span>to {formatDate(event.end_date)}</span>
@@ -585,17 +572,19 @@ export default function EventDetailsPage() {
               {!user ? (
                 <button
                   className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${eventParam}`)}`)}
+                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${encodeURIComponent(eventTitle || "")}`)}`)}
                 >
                   Sign in to Register
-                </button>              ) : registered ? (
+                </button>
+              ) : registered ? (
                 <div className="flex gap-3">
                   <button
                     className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
                     disabled
                   >
                     Registered
-                  </button>                  {attended && event?.show_start_button !== false && (
+                  </button>
+                  {attended && event?.show_start_button !== false && (
                     <Link
                       href={`/User/event-workflow/${event?.id}`}
                       className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"

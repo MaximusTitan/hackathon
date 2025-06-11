@@ -403,7 +403,8 @@ export default function Home() {
   // Handle event sharing by copying link to clipboard
   const handleShareEvent = async (event: Event) => {
     try {
-      const eventUrl = `${window.location.origin}/events/${event.id}`;
+      const eventSlug = encodeURIComponent(event.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+      const eventUrl = `${window.location.origin}/events/${eventSlug}`;
       await navigator.clipboard.writeText(eventUrl);
       toast.success('Event link copied to clipboard!');
     } catch (error) {
@@ -747,7 +748,7 @@ export default function Home() {
                         </Dialog>                      </div>
                       <div className="flex items-center gap-3">
                         <Link
-                          href={`/events/${event.id}`}
+                          href={`/events/${encodeURIComponent(event.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}`}
                           className={`inline-flex items-center gap-2 py-2.5 px-6 rounded-lg transition-colors text-base font-medium shadow-lg ${
                             showPastEvents 
                               ? "bg-gray-600 hover:bg-gray-700 text-white shadow-gray-100 hover:shadow-gray-200"

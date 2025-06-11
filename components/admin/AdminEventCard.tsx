@@ -107,7 +107,8 @@ export function AdminEventCard({
 
   const handleShareClick = async () => {
     try {
-      const eventUrl = `${window.location.origin}/events/${event.id}`;
+      const eventSlug = encodeURIComponent(event.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+      const eventUrl = `${window.location.origin}/events/${eventSlug}`;
       await navigator.clipboard.writeText(eventUrl);
       toast.success('Event link copied to clipboard!');
     } catch (error) {
@@ -248,7 +249,7 @@ export function AdminEventCard({
         </div>        {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 mt-4">
           <Link
-            href={`/events/${event.id}`}
+            href={`/events/${encodeURIComponent(event.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}`}
             className="inline-flex items-center gap-2 bg-rose-600 text-white py-2.5 px-4 rounded-lg hover:bg-rose-700 transition-colors font-medium shadow-lg shadow-rose-100 hover:shadow-rose-200"
           >
             View Details
