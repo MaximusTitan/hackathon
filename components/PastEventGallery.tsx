@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { Upload, X, Camera, Trash2 } from "lucide-react";
+import { Upload, X, Camera, Trash2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -29,6 +29,8 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
   const [captions, setCaptions] = useState<{ [key: number]: string }>({});
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<PastEventImage | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     fetchPastEventImages();
@@ -196,7 +198,6 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       setUploading(false);
     }
   };
-
   const handleDeleteImage = async (imageId: string) => {
     if (!confirm("Are you sure you want to delete this image?")) return;
 
@@ -233,6 +234,49 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       console.error("Delete error:", error);
       toast.error("Failed to delete image");
     }
+  };
+
+  const openImageModal = (image: PastEventImage) => {
+    setSelectedImage(image);
+    setShowModal(true);
+  };
+
+  const closeImageModal = () => {
+    setSelectedImage(null);
+    setShowModal(false);
+  };
+
+  // Handle keyboard navigation in modal
+  useEffect(() => {
+    if (!showModal) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeImageModal();
+      } else if (e.key === 'ArrowLeft') {
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        navigateImage('next');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showModal, selectedImage]);
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (!selectedImage) return;
+    
+    const currentIndex = images.findIndex(img => img.id === selectedImage.id);
+    let newIndex;
+    
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
+    } else {
+      newIndex = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    setSelectedImage(images[newIndex]);
   };
 
   if (loading) {
@@ -399,11 +443,10 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
             <p className="text-sm mt-1">Upload some images to showcase this event!</p>
           )}
         </div>
-      ) : (
-        <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
+      ) : (        <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
           {images.map((image) => (
             <div key={image.id} className="group relative break-inside-avoid mb-4">
-              <div className="relative overflow-hidden rounded-lg">
+              <div className="relative overflow-hidden rounded-lg cursor-pointer" onClick={() => openImageModal(image)}>
                 <Image
                   src={image.image_url}
                   alt={image.caption || "Past event image"}
@@ -419,6 +462,11 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
                   }}
                 />
                 
+                {/* Zoom overlay icon */}
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                  <ZoomIn className="w-8 h-8 text-white" />
+                </div>
+                
                 {/* Caption Overlay - Show to everyone */}
                 {image.caption && (
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 rounded-b-lg">
@@ -429,7 +477,10 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
                 {/* Admin Delete Button - Only show to authenticated admins */}
                 {isAdmin && currentUser && (currentUser.user_metadata?.role === 'admin' || currentUser.email === 'admin@hackon.com') && (
                   <button
-                    onClick={() => handleDeleteImage(image.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteImage(image.id);
+                    }}
                     className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -437,7 +488,74 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
                 )}
               </div>
             </div>
-          ))}
+          ))}        </div>
+      )}      {/* Full Screen Image Modal */}
+      {showModal && selectedImage && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          {/* Close button */}
+          <button
+            onClick={closeImageModal}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 bg-black/50 rounded-full p-2 z-20"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          {/* Navigation buttons */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={() => navigateImage('prev')}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 bg-black/50 rounded-full p-2 z-20"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => navigateImage('next')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 bg-black/50 rounded-full p-2 z-20"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </>
+          )}
+          
+          {/* Image counter */}
+          {images.length > 1 && (
+            <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm z-20">
+              {images.findIndex(img => img.id === selectedImage.id) + 1} / {images.length}
+            </div>
+          )}
+          
+          {/* Main image container */}
+          <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative max-w-[calc(100vw-8rem)] max-h-[calc(100vh-8rem)] flex items-center justify-center">
+              <Image
+                src={selectedImage.image_url}
+                alt={selectedImage.caption || "Past event image"}
+                width={1200}
+                height={800}
+                className="max-w-full max-h-full object-contain"
+                sizes="(max-width: 768px) calc(100vw - 2rem), calc(100vw - 8rem)"
+                style={{ width: 'auto', height: 'auto' }}
+              />
+            </div>
+            
+            {/* Image caption */}
+            {selectedImage.caption && (
+              <div className="absolute bottom-4 left-4 right-4 bg-black/80 text-white p-4 rounded-lg">
+                <p className="text-center text-lg">{selectedImage.caption}</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Click outside to close */}
+          <div
+            className="absolute inset-0 -z-10"
+            onClick={closeImageModal}
+          />
         </div>
       )}
     </div>

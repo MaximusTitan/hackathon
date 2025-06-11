@@ -8,11 +8,48 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("events")
-      .select("*")
-      .eq("id", id)
-      .single();
+    
+    // Function to determine if param is an ID (UUID) or title slug
+    const isUUID = (str: string) => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    };
+
+    let data, error;
+
+    if (isUUID(id)) {
+      // Handle UUID lookup
+      const result = await supabase
+        .from("events")
+        .select("*")
+        .eq("id", id)
+        .single();
+      data = result.data;
+      error = result.error;
+    } else {
+      // Handle title slug lookup
+      const decodedTitle = decodeURIComponent(id).replace(/-/g, ' ');
+      
+      // First try exact match (case insensitive)
+      let result = await supabase
+        .from("events")
+        .select("*")
+        .ilike("title", decodedTitle)
+        .single();
+
+      // If no exact match, try partial match
+      if (result.error || !result.data) {
+        result = await supabase
+          .from("events")
+          .select("*")
+          .ilike("title", `%${decodedTitle}%`)
+          .limit(1)
+          .single();
+      }
+      
+      data = result.data;
+      error = result.error;
+    }
 
     if (error || !data) {
       return NextResponse.json({ event: null }, { status: 404 });

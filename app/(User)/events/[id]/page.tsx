@@ -79,18 +79,14 @@ export default function EventDetailsPage() {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   };
-
   // Optimized useEffect: Show event details immediately, load participants and winners after
   useEffect(() => {
     async function initPageOptimized() {
       try {
         setLoading(true);
         
-        // Determine API endpoint based on parameter type
-        const isId = eventParam && isUUID(eventParam);
-        const apiEndpoint = isId 
-          ? `/api/events/${eventParam}` 
-          : `/api/events/by-title/${encodeURIComponent(eventParam || '')}`;
+        // Use the same API endpoint for both ID and title-based lookups
+        const apiEndpoint = `/api/events/${encodeURIComponent(eventParam || '')}`;
         
         // Start both event and auth checks simultaneously
         const [eventRes, authRes] = await Promise.all([
