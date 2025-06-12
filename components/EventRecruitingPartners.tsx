@@ -46,7 +46,7 @@ export default function EventRecruitingPartners({ eventId }: EventRecruitingPart
   return (
     <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
       <div className="mb-3">        <h3 className="text-lg font-semibold text-gray-800 mb-1">
-          🚀 Recruiting Partners
+        Recruiting Partners
         </h3>
         <p className="text-gray-600 text-xs">
           Connect with top companies looking for talented developers
