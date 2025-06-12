@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
-import PastEventGallery from "@/components/PastEventGallery";
-import EventRecruitingPartners from "@/components/EventRecruitingPartners";
-import InlineRecruitingPartnersAdmin from "@/components/InlineRecruitingPartnersAdmin";
+
+// Lazy load heavy components
+const PastEventGallery = lazy(() => import("@/components/PastEventGallery"));
+const EventRecruitingPartners = lazy(() => import("@/components/EventRecruitingPartners"));
+const InlineRecruitingPartnersAdmin = lazy(() => import("@/components/InlineRecruitingPartnersAdmin"));
 
 type Participant = {
   id: string;
@@ -80,27 +82,36 @@ export default function EventDetailsPage() {
   const isUUID = (str: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
-  };
-  // Optimized useEffect: Show event details immediately, load participants and winners after
+  };  // Load event data and auth data
   useEffect(() => {
-    async function initPageOptimized() {
+    if (!eventParam) return;
+
+    async function loadEventAndAuth() {
+      const startTime = performance.now();
+      
       try {
         setLoading(true);
         
         // Use the same API endpoint for both ID and title-based lookups
-        const apiEndpoint = `/api/events/${encodeURIComponent(eventParam || '')}`;
+        const apiEndpoint = `/api/events/${encodeURIComponent(eventParam as string)}`;
         
         // Start both event and auth checks simultaneously
         const [eventRes, authRes] = await Promise.all([
-          eventParam ? fetch(apiEndpoint) : Promise.resolve({ ok: false }),
+          fetch(apiEndpoint),
           fetch('/api/auth/check')
         ]);
 
         // Handle event data first (show immediately)
-        if (eventRes.ok && eventRes instanceof Response) {
+        let loadedEvent = null;
+        if (eventRes.ok) {
           const eventData = await eventRes.json();
-          setEvent(eventData.event);
+          loadedEvent = eventData.event;
+          setEvent(loadedEvent);
         }
+        
+        const eventLoadTime = performance.now();
+        console.log(`Event data loaded in ${Math.round(eventLoadTime - startTime)}ms`);
+        
         setLoading(false); // Show event details immediately
 
         // Handle auth data
@@ -109,89 +120,96 @@ export default function EventDetailsPage() {
           setUser(authData.user);
           // Check if user is admin
           setIsAdmin(authData.user?.user_metadata?.role === 'admin' || authData.user?.email === 'admin@hackon.com');
-          // Check registration status (non-blocking)
-          if (event?.id) {
-            fetch(`/api/registrations/check?event_id=${event.id}`)
-              .then(res => res.ok ? res.json() : { registered: false, attended: false })
-              .then(regData => {
+
+          // Check registration status if event is loaded
+          if (loadedEvent?.id) {
+            try {
+              const regRes = await fetch(`/api/registrations/check?event_id=${loadedEvent.id}`);
+              if (regRes.ok) {
+                const regData = await regRes.json();
                 setRegistered(regData.registered);
                 setAttended(regData.attended || false);
-              })
-              .catch(() => {
-                setRegistered(false);
-                setAttended(false);
-              });
-          }
+              }
+            } catch (error) {
+              console.error("Error checking registration:", error);
+            }
 
-          // Handle payment flow (non-blocking)
-          if (typeof window !== 'undefined') {
-            const paymentIntent = window.sessionStorage.getItem('register_payment_intent');
-            if (paymentIntent === event?.id) {
-              window.sessionStorage.removeItem('register_payment_intent');
-              // Process payment after a short delay to ensure event is loaded
-              setTimeout(() => {
-                if (event?.is_paid && event?.price && !registered) {
-                  processPayment();
-                }
-              }, 100);
+            // Handle payment flow
+            if (typeof window !== 'undefined') {
+              const paymentIntent = window.sessionStorage.getItem('register_payment_intent');
+              if (paymentIntent === loadedEvent.id) {
+                window.sessionStorage.removeItem('register_payment_intent');
+                // Process payment after a short delay
+                setTimeout(() => {
+                  if (loadedEvent.is_paid && loadedEvent.price && !registered) {
+                    processPayment();
+                  }
+                }, 100);
+              }
             }
           }
         }
         setCheckingAuth(false);
-
-        // Load participants in background (non-blocking)
-        if (event?.id) {
-          setParticipantsLoading(true);
-          // Add a small delay to prioritize main content loading
-          setTimeout(async () => {
-            try {
-              const partRes = await fetch(`/api/events/${event.id}/participants`);
-              if (partRes.ok) {
-                const partData = await partRes.json();
-                setParticipants(partData.participants || []);
-              }
-            } catch (error) {
-              console.error("Error loading participants:", error);
-            } finally {
-              setParticipantsLoading(false);
-            }
-          }, 200);
-        } else {
-          setParticipantsLoading(false);
-        }
-
-        // Load winners and runners-up
-        if (event?.id) {
-          setWinnersLoading(true);
-          setTimeout(async () => {
-            try {
-              const winnersRes = await fetch(`/api/events/${event.id}/winners`);
-              if (winnersRes.ok) {
-                const winnersData = await winnersRes.json();
-                setWinners(winnersData.winners || []);
-                setRunnersUp(winnersData.runnersUp || []);
-              }
-            } catch (error) {
-              console.error("Error loading winners:", error);
-            } finally {
-              setWinnersLoading(false);
-            }
-          }, 300);
-        } else {
-          setWinnersLoading(false);
-        }
+        
+        const totalTime = performance.now();
+        console.log(`Total page initialization: ${Math.round(totalTime - startTime)}ms`);
 
       } catch (error) {
-        console.error("Error initializing page:", error);
+        console.error("Error loading event and auth:", error);
         setLoading(false);
         setCheckingAuth(false);
-        setParticipantsLoading(false);
-        setWinnersLoading(false);
       }
     }
 
-    initPageOptimized();
-  }, [eventParam, event?.id]);
+    loadEventAndAuth();
+  }, [eventParam]);
+
+  // Load participants and winners after event is loaded
+  useEffect(() => {
+    if (!event?.id) return;
+
+    const timeouts: NodeJS.Timeout[] = [];
+
+    // Load participants in background
+    setParticipantsLoading(true);
+    const participantsTimeout = setTimeout(async () => {
+      try {
+        const partRes = await fetch(`/api/events/${event.id}/participants`);
+        if (partRes.ok) {
+          const partData = await partRes.json();
+          setParticipants(partData.participants || []);
+        }
+      } catch (error) {
+        console.error("Error loading participants:", error);
+      } finally {
+        setParticipantsLoading(false);
+      }
+    }, 100);
+    timeouts.push(participantsTimeout);
+
+    // Load winners and runners-up
+    setWinnersLoading(true);
+    const winnersTimeout = setTimeout(async () => {
+      try {
+        const winnersRes = await fetch(`/api/events/${event.id}/winners`);
+        if (winnersRes.ok) {
+          const winnersData = await winnersRes.json();
+          setWinners(winnersData.winners || []);
+          setRunnersUp(winnersData.runnersUp || []);
+        }
+      } catch (error) {
+        console.error("Error loading winners:", error);
+      } finally {
+        setWinnersLoading(false);
+      }
+    }, 150);
+    timeouts.push(winnersTimeout);
+
+    // Cleanup function
+    return () => {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [event?.id]);
 
   async function handleRegister() {
     try {
@@ -400,9 +418,7 @@ export default function EventDetailsPage() {
     } else {
       router.push('/'); // Fallback to home if no history
     }
-  };
-
-  if (loading) {
+  };  if (loading) {
     return (
       <div className="w-full max-w-4xl mx-auto p-6">
         {/* Back button skeleton */}
@@ -410,21 +426,21 @@ export default function EventDetailsPage() {
           <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
         </div>
 
-        {/* Event details skeleton */}
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-pulse">
-          <div className="w-full h-80 md:h-96 lg:h-[500px] bg-gray-200"></div>
+        {/* Event details skeleton - optimized for faster perceived loading */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="w-full h-80 md:h-96 lg:h-[500px] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 animate-pulse"></div>
           <div className="p-6 md:p-8">
-            <div className="h-8 bg-gray-200 rounded w-3/4 mb-4"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-4">
-                <div className="h-16 bg-gray-200 rounded"></div>
-                <div className="h-16 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded w-3/4 mb-4 animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-3">
+                <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
+                <div className="h-12 bg-gray-100 rounded animate-pulse" style={{ animationDelay: '0.1s' }}></div>
               </div>
-              <div className="space-y-4">
-                <div className="h-16 bg-gray-200 rounded"></div>
+              <div className="space-y-3">
+                <div className="h-12 bg-gray-100 rounded animate-pulse" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
-            <div className="h-12 bg-gray-200 rounded w-48"></div>
+            <div className="h-10 bg-gray-200 rounded w-40 animate-pulse" style={{ animationDelay: '0.3s' }}></div>
           </div>
         </div>
       </div>
@@ -567,27 +583,29 @@ export default function EventDetailsPage() {
                 </div>
               )}
             </div>
-          </div>
-
-          {event.description && (
+          </div>          {event.description && (
             <div className="mb-8">
-              <h2 className="text-xl font-semibold text-rose-600 mb-4"></h2>
+              <h2 className="text-xl font-semibold text-rose-600 mb-4">About This Event</h2>
               <div 
                 className="prose prose-gray max-w-none text-gray-700 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-6 [&_h1:first-child]:mt-0 [&_h1]:text-gray-800 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2:first-child]:mt-0 [&_h2]:text-gray-800 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-3 [&_h3:first-child]:mt-0 [&_h3]:text-gray-800 [&_p]:mb-1 [&_p]:leading-normal [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-2 [&_ul]:space-y-0 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-2 [&_ol]:space-y-0 [&_li]:pl-1 [&_li]:leading-normal [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_a]:text-blue-600 [&_a]:underline [&_a:hover]:text-blue-800 [&_br]:block [&_br]:h-1"
                 dangerouslySetInnerHTML={{ __html: event.description }}
               />
             </div>
           )}          {/* Recruiting Partners Section */}
-          {event && <EventRecruitingPartners key={recruitingPartnersKey} eventId={event.id} />}
+          <Suspense fallback={<div className="mb-8 h-32 bg-gray-100 rounded-lg animate-pulse"></div>}>
+            {event && <EventRecruitingPartners key={recruitingPartnersKey} eventId={event.id} />}
+          </Suspense>
 
           {/* Admin: Inline Recruiting Partners Management */}
-          {event && (
-            <InlineRecruitingPartnersAdmin 
-              eventId={event.id} 
-              isAdmin={isAdmin}
-              onPartnersUpdate={() => setRecruitingPartnersKey(prev => prev + 1)}
-            />
-          )}
+          <Suspense fallback={isAdmin ? <div className="mb-8 h-24 bg-gray-100 rounded-lg animate-pulse"></div> : null}>
+            {event && (
+              <InlineRecruitingPartnersAdmin 
+                eventId={event.id} 
+                isAdmin={isAdmin}
+                onPartnersUpdate={() => setRecruitingPartnersKey(prev => prev + 1)}
+              />
+            )}
+          </Suspense>
 
           {/* Registration Button */}
           {!isEventPast && (
@@ -634,10 +652,10 @@ export default function EventDetailsPage() {
                 </button>
               )}
             </div>
-          )}
-
-          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
-          <PastEventGallery eventId={event?.id || ""} isAdmin={isAdmin} />
+          )}          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
+          <Suspense fallback={<div className="mb-8 h-48 bg-gray-100 rounded-lg animate-pulse"></div>}>
+            <PastEventGallery eventId={event?.id || ""} isAdmin={isAdmin} />
+          </Suspense>
 
           {/* Winners and Runners-up Section - Moved before participants */}
           {(winners.length > 0 || runnersUp.length > 0) && (
