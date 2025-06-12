@@ -89,7 +89,7 @@ export default function HeaderNav() {
   const profileHref =
     user?.user_metadata?.role === "admin"
       ? "/admin/profile"
-      : "/User/profile";
+      : "/profile";
 
   return (
     <header className="w-full bg-white/80 border-b border-gray-200 shadow-sm mb-2 sticky top-0 z-50 backdrop-blur-sm">

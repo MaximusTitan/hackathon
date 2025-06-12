@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Share2 } from "lucide-react";
+import { Share2, Users } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface AdminDashboardHeaderProps {
   showPastEvents: boolean;
@@ -23,17 +24,18 @@ export function AdminDashboardHeader({
   };
 
   return (
-    <>
-      <header className="flex justify-between items-center mb-8">
+    <>      <header className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
           <p className="text-gray-600">Manage your events and community</p>
-        </div>        <Button
-          onClick={onCreateEvent}
-          className="bg-rose-600 hover:bg-rose-700 text-white"
-        >
-          {showCreate ? "Hide Event Form" : "Create Event"}
-        </Button>
+        </div>        <div className="flex items-center gap-3">
+          <Button
+            onClick={onCreateEvent}
+            className="bg-rose-600 hover:bg-rose-700 text-white"
+          >
+            {showCreate ? "Hide Event Form" : "Create Event"}
+          </Button>
+        </div>
       </header>
 
       <div className="flex justify-between items-center mb-4">

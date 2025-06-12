@@ -53,7 +53,7 @@ export const updateSession = async (request: NextRequest) => {
       const userRole = userData?.user_metadata?.role;
       
       if (!(userRole === "admin" || userRole == null || userRole === "")) {
-        return NextResponse.redirect(new URL("/User/dashboard", request.url));
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     }
     

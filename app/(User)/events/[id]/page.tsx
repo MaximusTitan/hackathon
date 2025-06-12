@@ -8,6 +8,8 @@ import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal 
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
 import PastEventGallery from "@/components/PastEventGallery";
+import EventRecruitingPartners from "@/components/EventRecruitingPartners";
+import InlineRecruitingPartnersAdmin from "@/components/InlineRecruitingPartnersAdmin";
 
 type Participant = {
   id: string;
@@ -65,10 +67,10 @@ export default function EventDetailsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [participantsLoading, setParticipantsLoading] = useState(true);
   const [winners, setWinners] = useState<Participant[]>([]);
-  const [runnersUp, setRunnersUp] = useState<Participant[]>([]);
-  const [winnersLoading, setWinnersLoading] = useState(true);
+  const [runnersUp, setRunnersUp] = useState<Participant[]>([]);  const [winnersLoading, setWinnersLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const router = useRouter();  const supabase = createClientComponentClient();
+  const [recruitingPartnersKey, setRecruitingPartnersKey] = useState(0);
+  const router = useRouter();const supabase = createClientComponentClient();
 
   // Check if event is in the past
   const isEventPast = event && event.start_date ? 
@@ -200,7 +202,7 @@ export default function EventDetailsPage() {
       const safeEventId = event?.id || "";
 
       if (!authData.authenticated) {
-        const returnUrl = `/User/events/${eventParam}`;
+        const returnUrl = `/events/${eventParam}`;
         // --- Store payment intent if paid event ---
         if (event?.is_paid && event?.price && event.price > 0 && typeof window !== 'undefined') {
           window.sessionStorage.setItem('register_payment_intent', safeEventId);
@@ -575,26 +577,38 @@ export default function EventDetailsPage() {
                 dangerouslySetInnerHTML={{ __html: event.description }}
               />
             </div>
-          )}          {/* Registration Button */}
+          )}          {/* Recruiting Partners Section */}
+          {event && <EventRecruitingPartners key={recruitingPartnersKey} eventId={event.id} />}
+
+          {/* Admin: Inline Recruiting Partners Management */}
+          {event && (
+            <InlineRecruitingPartnersAdmin 
+              eventId={event.id} 
+              isAdmin={isAdmin}
+              onPartnersUpdate={() => setRecruitingPartnersKey(prev => prev + 1)}
+            />
+          )}
+
+          {/* Registration Button */}
           {!isEventPast && (
             <div className="mt-8 mb-8">
               {!user ? (
                 <button
-                  className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/User/events/${eventParam}`)}`)}
+                  className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
+                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/events/${eventParam}`)}`)}
                 >
                   Sign in to Register
                 </button>              ) : registered ? (
                 <div className="flex gap-3">
                   <button
-                    className="bg-green-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
+                    className="bg-rose-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
                     disabled
                   >
                     Registered
                   </button>                  {attended && event?.show_start_button !== false && (
                     <Link
-                      href={`/User/event-workflow/${event?.id}`}
-                      className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                      href={`/event-workflow/${event?.id}`}
+                      className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
                     >
                       Enter Event
                       <ExternalLink className="w-4 h-4" />
@@ -604,7 +618,7 @@ export default function EventDetailsPage() {
               ) : (
                 <button
                   className={`${
-                    event?.is_paid ? "bg-green-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
+                    event?.is_paid ? "bg-rose-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
                   } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
                     registering ? "opacity-50 cursor-not-allowed" : ""
                   }`}
@@ -646,7 +660,7 @@ export default function EventDetailsPage() {
                         <div key={winner.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3">
                           {winner.photo_url ? (
                             <Link
-                              href={`/User/profile/${winner.user_id}`}
+                              href={`/profile/${winner.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <Image
@@ -660,7 +674,7 @@ export default function EventDetailsPage() {
                             </Link>
                           ) : (
                             <Link
-                              href={`/User/profile/${winner.user_id}`}
+                              href={`/profile/${winner.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-100 text-yellow-600 font-bold text-lg border-2 border-yellow-300">
@@ -700,7 +714,7 @@ export default function EventDetailsPage() {
                         <div key={runnerUp.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3">
                           {runnerUp.photo_url ? (
                             <Link
-                              href={`/User/profile/${runnerUp.user_id}`}
+                              href={`/profile/${runnerUp.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <Image
@@ -714,7 +728,7 @@ export default function EventDetailsPage() {
                             </Link>
                           ) : (
                             <Link
-                              href={`/User/profile/${runnerUp.user_id}`}
+                              href={`/profile/${runnerUp.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <span className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 text-gray-600 font-bold text-lg border-2 border-gray-300">
@@ -795,7 +809,7 @@ export default function EventDetailsPage() {
                         <td className="px-4 py-2">
                           {p.photo_url ? (
                             <Link
-                              href={`/User/profile/${p.user_id}`}
+                              href={`/profile/${p.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <Image
@@ -809,7 +823,7 @@ export default function EventDetailsPage() {
                             </Link>
                           ) : (
                             <Link
-                              href={`/User/profile/${p.user_id}`}
+                              href={`/profile/${p.user_id}`}
                               className="cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold hover:bg-gray-200">

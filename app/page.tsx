@@ -712,7 +712,7 @@ export default function Home() {
                                   selectedEventParticipants.map((participant) => (
                                     <Link
                                       key={participant.id}
-                                      href={`/User/profile/${participant.user_id}`}
+                                      href={`/profile/${participant.user_id}`}
                                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
                                       onClick={() => setDialogOpen(false)}
                                     >                                      <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0 relative">

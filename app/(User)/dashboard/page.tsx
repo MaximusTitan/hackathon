@@ -108,7 +108,7 @@ export default function UserDashboard() {
                   </div>
                   <div className="mt-4">
                     <Link
-                      href={`/User/events/${encodeURIComponent(reg.events.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}`}
+                      href={`/events/${encodeURIComponent(reg.events.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''))}`}
                       className="bg-rose-600 text-white py-2 px-4 rounded-lg hover:bg-rose-700 transition-colors inline-block text-sm"
                     >
                       View Event Details
