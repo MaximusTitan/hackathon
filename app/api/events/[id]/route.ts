@@ -25,27 +25,16 @@ export async function GET(
         .eq("id", id)
         .single();
       data = result.data;
-      error = result.error;
-    } else {
+      error = result.error;    } else {
       // Handle title slug lookup
       const decodedTitle = decodeURIComponent(id).replace(/-/g, ' ');
       
-      // First try exact match (case insensitive)
-      let result = await supabase
+      // Try exact match only (case insensitive)
+      const result = await supabase
         .from("events")
         .select("*")
         .ilike("title", decodedTitle)
         .single();
-
-      // If no exact match, try partial match
-      if (result.error || !result.data) {
-        result = await supabase
-          .from("events")
-          .select("*")
-          .ilike("title", `%${decodedTitle}%`)
-          .limit(1)
-          .single();
-      }
       
       data = result.data;
       error = result.error;
@@ -105,14 +94,21 @@ export async function PUT(
       ...(body.hasOwnProperty('date_tba') && { date_tba: !!body.date_tba }),
       ...(body.hasOwnProperty('time_tba') && { time_tba: !!body.time_tba }),
       ...(body.hasOwnProperty('venue_tba') && { venue_tba: !!body.venue_tba }),
-    };
-
-    const { error } = await supabase
+    };    const { error } = await supabase
       .from("events")
       .update(processedUpdateData)
       .eq("id", id);
 
     if (error) {
+      console.error("Error updating event:", error);
+      
+      // Handle unique constraint violation for title
+      if (error.code === '23505' && error.message.includes('events_title_key')) {
+        return NextResponse.json({ 
+          error: "An event with this title already exists. Please choose a different title." 
+        }, { status: 409 });
+      }
+      
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

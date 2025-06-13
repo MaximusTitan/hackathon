@@ -18,11 +18,10 @@ async function getEvent(eventParam: string) {
     let query = supabase.from('events').select('*');
     
     if (isUUID) {
-      query = query.eq('id', eventParam);
-    } else {
+      query = query.eq('id', eventParam);    } else {
       // Convert URL slug back to title for matching
       const decodedTitle = decodeURIComponent(eventParam).replace(/-/g, ' ');
-      query = query.ilike('title', `%${decodedTitle}%`);
+      query = query.ilike('title', decodedTitle);
     }
     
     const { data: events, error } = await query.limit(1);

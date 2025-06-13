@@ -104,12 +104,18 @@ export async function POST(request: Request) {
       date_tba: !!eventData.date_tba,
       time_tba: !!eventData.time_tba,
       venue_tba: !!eventData.venue_tba,
-    };
-
-    const { error } = await supabase.from("events").insert([processedEventData]);
+    };    const { error } = await supabase.from("events").insert([processedEventData]);
 
     if (error) {
       console.error("Error creating event:", error);
+      
+      // Handle unique constraint violation for title
+      if (error.code === '23505' && error.message.includes('events_title_key')) {
+        return NextResponse.json({ 
+          error: "An event with this title already exists. Please choose a different title." 
+        }, { status: 409 });
+      }
+      
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 

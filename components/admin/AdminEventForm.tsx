@@ -120,6 +120,49 @@ export function AdminEventForm({
   onImageChange,
   onImageUrlChange
 }: AdminEventFormProps) {
+  const [titleError, setTitleError] = useState<string>("");
+  const [checkingTitle, setCheckingTitle] = useState(false);
+
+  // Function to check if title already exists
+  const checkTitleUniqueness = useCallback(async (title: string) => {
+    if (!title.trim() || title === editingEvent?.title) {
+      setTitleError("");
+      return;
+    }
+
+    setCheckingTitle(true);
+    try {
+      const response = await fetch(`/api/events/check-title?title=${encodeURIComponent(title.trim())}`);
+      const data = await response.json();
+      
+      if (data.exists) {
+        setTitleError("An event with this title already exists. Please choose a different title.");
+      } else {
+        setTitleError("");
+      }
+    } catch (error) {
+      console.error("Error checking title:", error);
+      // Don't show error to user for network issues
+      setTitleError("");
+    } finally {
+      setCheckingTitle(false);
+    }
+  }, [editingEvent?.title]);
+
+  // Debounced title change handler
+  const handleTitleChange = useCallback((title: string) => {
+    setForm((f: any) => ({ ...f, title }));
+    
+    // Clear previous error immediately
+    setTitleError("");
+    
+    // Debounce the title check
+    const timeoutId = setTimeout(() => {
+      checkTitleUniqueness(title);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [setForm, checkTitleUniqueness]);
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (onImageChange) {
       onImageChange(e);
@@ -162,20 +205,38 @@ export function AdminEventForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-6">
-          <div className="grid gap-4">
-            {/* Event Title */}
+          <div className="grid gap-4">            {/* Event Title */}
             <div className="grid gap-2">
               <Label htmlFor="title" className="text-gray-700">
                 Event Title
               </Label>
-              <Input
-                id="title"
-                placeholder="Enter event title"
-                value={form.title}
-                onChange={(e) => setForm((f: any) => ({ ...f, title: e.target.value }))}
-                required
-                className="border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white"
-              />            </div>
+              <div className="relative">
+                <Input
+                  id="title"
+                  placeholder="Enter event title"
+                  value={form.title}
+                  onChange={(e) => handleTitleChange(e.target.value)}
+                  required
+                  className={`border-gray-200 text-gray-900 placeholder:text-gray-500 bg-white ${
+                    titleError ? 'border-red-500 focus:border-red-500' : ''
+                  }`}
+                />
+                {checkingTitle && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              {titleError && (
+                <p className="text-red-600 text-sm mt-1 flex items-center gap-1">
+                  <span className="text-red-500">⚠</span>
+                  {titleError}
+                </p>
+              )}
+              <p className="text-gray-500 text-xs">
+                Event titles must be unique. This will be used to generate the event URL.
+              </p>
+            </div>
 
             {/* Date TBA Toggle */}
             <div className="flex items-center gap-3 mb-4">
@@ -609,13 +670,11 @@ export function AdminEventForm({
                   : "This event is free for all users to attend"}
               </div>
             </div>
-          </div>
-
-          <div className="flex gap-2">
+          </div>          <div className="flex gap-2">
             <Button
               type="submit"
-              disabled={creating || uploading}
-              className="bg-rose-600 hover:bg-rose-700 text-white flex-1"
+              disabled={creating || uploading || !!titleError || checkingTitle}
+              className="bg-rose-600 hover:bg-rose-700 text-white flex-1 disabled:opacity-50"
             >
               {creating ? "Saving..." : isEditing ? "Update Event" : "Create Event"}
             </Button>
