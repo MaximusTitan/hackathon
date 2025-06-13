@@ -4,7 +4,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal } from "lucide-react";
+import { CalendarIcon, Clock, MapPin, ExternalLink, Video, Users, Trophy, Medal, Share2 } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
 
@@ -418,7 +418,20 @@ export default function EventDetailsPage() {
     } else {
       router.push('/'); // Fallback to home if no history
     }
-  };  if (loading) {
+  };  // Handle event sharing by copying link to clipboard
+  const handleShareEvent = async () => {
+    try {
+      const eventSlug = encodeURIComponent(event!.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+      const eventUrl = `${window.location.origin}/events/${eventSlug}`;
+      await navigator.clipboard.writeText(eventUrl);
+      toast.success('Event link copied to clipboard!');
+    } catch (error) {
+      console.error('Share error:', error);
+      toast.error('Failed to copy link. Please try again.');
+    }
+  };
+
+  if (loading) {
     return (
       <div className="w-full max-w-4xl mx-auto p-6">
         {/* Back button skeleton */}
@@ -609,21 +622,39 @@ export default function EventDetailsPage() {
 
           {/* Registration Button */}
           {!isEventPast && (
-            <div className="mt-8 mb-8">
+            <div className="mt-8 mb-8 flex flex-col sm:flex-row gap-3">
               {!user ? (
-                <button
-                  className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                  onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/events/${eventParam}`)}`)}
-                >
-                  Sign in to Register
-                </button>              ) : registered ? (
-                <div className="flex gap-3">
+                <>
+                  <button
+                    className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
+                    onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/events/${eventParam}`)}`)}
+                  >
+                    Sign in to Register
+                  </button>
+                  <button
+                    onClick={handleShareEvent}
+                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Event
+                  </button>
+                </>
+              ) : registered ? (
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     className="bg-rose-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
                     disabled
                   >
                     Registered
-                  </button>                  {attended && event?.show_start_button !== false && (
+                  </button>
+                  <button
+                    onClick={handleShareEvent}
+                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Event
+                  </button>
+                  {attended && event?.show_start_button !== false && (
                     <Link
                       href={`/event-workflow/${event?.id}`}
                       className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
@@ -634,22 +665,31 @@ export default function EventDetailsPage() {
                   )}
                 </div>
               ) : (
-                <button
-                  className={`${
-                    event?.is_paid ? "bg-rose-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
-                  } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
-                    registering ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                  onClick={handleRegister}
-                  disabled={registering}
-                >
-                  {registering 
-                    ? "Processing..." 
-                    : event?.is_paid && event?.price
-                      ? `Pay ₹${event.price} & Register`
-                      : "Register for Event"
-                  }
-                </button>
+                <>
+                  <button
+                    className={`${
+                      event?.is_paid ? "bg-rose-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
+                    } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
+                      registering ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    onClick={handleRegister}
+                    disabled={registering}
+                  >
+                    {registering 
+                      ? "Processing..." 
+                      : event?.is_paid && event?.price
+                        ? `Pay ₹${event.price} & Register`
+                        : "Register for Event"
+                    }
+                  </button>
+                  <button
+                    onClick={handleShareEvent}
+                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share Event
+                  </button>
+                </>
               )}
             </div>
           )}          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}

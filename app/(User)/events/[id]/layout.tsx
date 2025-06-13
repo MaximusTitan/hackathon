@@ -1,0 +1,116 @@
+import { Metadata } from 'next';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+
+type Props = {
+  params: Promise<{ id: string }>;
+  children: React.ReactNode;
+};
+
+async function getEvent(eventParam: string) {
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  
+  try {
+    // Check if it's a UUID or title slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventParam);
+    
+    let query = supabase.from('events').select('*');
+    
+    if (isUUID) {
+      query = query.eq('id', eventParam);
+    } else {
+      // Convert URL slug back to title for matching
+      const decodedTitle = decodeURIComponent(eventParam).replace(/-/g, ' ');
+      query = query.ilike('title', `%${decodedTitle}%`);
+    }
+    
+    const { data: events, error } = await query.limit(1);
+    
+    if (error || !events || events.length === 0) {
+      return null;
+    }
+    
+    return events[0];
+  } catch (error) {
+    console.error('Error fetching event for metadata:', error);
+    return null;
+  }
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const resolvedParams = await params;
+  const event = await getEvent(resolvedParams.id);
+  
+  if (!event) {
+    return {
+      title: 'Event Not Found | Hackon',
+      description: 'The requested event could not be found.',
+    };
+  }
+
+  const eventTitle = `${event.title} | Hackon`;
+  const eventDescription = event.description 
+    ? event.description.replace(/<[^>]*>/g, '').substring(0, 160) + '...'
+    : `Join ${event.title} - an amazing event hosted by Hackon.`;
+
+  // Format date for OG image
+  const eventDate = event.start_date ? new Date(event.start_date).toISOString() : '';
+  
+  // Get location for OG image
+  const getLocationDisplay = () => {
+    if (event.event_type === "virtual") {
+      return "Virtual Event";
+    } else if (event.location) {
+      return event.location;
+    } else if (event.venue_name) {
+      const cityPart = event.city ? `, ${event.city}` : "";
+      return `${event.venue_name}${cityPart}`;
+    }
+    return event.venue_tba ? "Venue TBA" : "Location TBD";
+  };
+
+  const locationDisplay = getLocationDisplay();
+
+  // Generate OG image URL
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  const ogImageUrl = new URL('/api/og/event', baseUrl);
+  ogImageUrl.searchParams.set('title', event.title);
+  if (eventDate) ogImageUrl.searchParams.set('date', eventDate);
+  if (locationDisplay) ogImageUrl.searchParams.set('location', locationDisplay);
+  if (event.event_type) ogImageUrl.searchParams.set('type', event.event_type);
+  return {
+    title: eventTitle,
+    description: eventDescription,
+    openGraph: {
+      title: eventTitle,
+      description: eventDescription,
+      type: 'website',
+      images: [
+        {
+          url: ogImageUrl.toString(),
+          width: 1200,
+          height: 630,
+          alt: `${event.title} - Hackon Event`,
+          type: 'image/svg+xml',
+        },
+        ...(event.image_url ? [{
+          url: event.image_url,
+          width: 800,
+          height: 600,
+          alt: event.title,
+        }] : []),
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: eventTitle,
+      description: eventDescription,
+      images: [ogImageUrl.toString()],
+    },
+  };
+}
+
+export default function EventLayout({ children }: Props) {
+  return children;
+}
