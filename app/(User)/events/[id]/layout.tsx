@@ -49,37 +49,85 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const eventTitle = `${event.title} | Hackon`;
-  const eventDescription = event.description 
-    ? event.description.replace(/<[^>]*>/g, '').substring(0, 160) + '...'
-    : `Join ${event.title} - an amazing event hosted by Hackon.`;
-
-  // Format date for OG image
-  const eventDate = event.start_date ? new Date(event.start_date).toISOString() : '';
-  
-  // Get location for OG image
-  const getLocationDisplay = () => {
-    if (event.event_type === "virtual") {
-      return "Virtual Event";
-    } else if (event.location) {
-      return event.location;
-    } else if (event.venue_name) {
-      const cityPart = event.city ? `, ${event.city}` : "";
-      return `${event.venue_name}${cityPart}`;
+  // Safely handle event data
+  const eventTitle = `${event.title || 'Untitled Event'} | Hackon`;
+  const rawDescription = event.description || '';
+  const eventDescription = rawDescription
+    ? rawDescription.replace(/<[^>]*>/g, '').substring(0, 160) + '...'
+    : `Join ${event.title || 'this event'} - an amazing event hosted by Hackon.`;
+  // Safely format date for OG image
+  let eventDate = '';
+  if (event.start_date && !event.date_tba) {
+    try {
+      // Handle date field (which comes as date type from database)
+      const date = new Date(event.start_date);
+      if (!isNaN(date.getTime())) {
+        eventDate = date.toISOString();
+      }
+    } catch (error) {
+      console.warn('Failed to parse event date:', event.start_date);
     }
-    return event.venue_tba ? "Venue TBA" : "Location TBD";
+  }
+    // Get location for OG image with error handling
+  const getLocationDisplay = () => {
+    try {
+      // Handle venue_tba flag
+      if (event.venue_tba) {
+        return "Venue TBA";
+      }
+      
+      if (event.event_type === "virtual") {
+        return "Virtual Event";
+      } else if (event.location && event.location.trim()) {
+        return event.location.trim();
+      } else if (event.venue_name && event.venue_name.trim()) {
+        const cityPart = event.city && event.city.trim() ? `, ${event.city.trim()}` : "";
+        return `${event.venue_name.trim()}${cityPart}`;
+      }
+      return "Location TBD";
+    } catch (error) {
+      console.warn('Error getting location display:', error);
+      return "Location TBD";
+    }
   };
 
   const locationDisplay = getLocationDisplay();
 
-  // Generate OG image URL
-  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+  // Generate OG image URL with error handling
+  const getBaseUrl = () => {
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`;
+    }
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      return process.env.NEXT_PUBLIC_SITE_URL;
+    }
+    return 'http://localhost:3000';
+  };
+
+  const baseUrl = getBaseUrl();
   const ogImageUrl = new URL('/api/og/event', baseUrl);
-  ogImageUrl.searchParams.set('title', event.title);
-  if (eventDate) ogImageUrl.searchParams.set('date', eventDate);
-  if (locationDisplay) ogImageUrl.searchParams.set('location', locationDisplay);
-  if (event.event_type) ogImageUrl.searchParams.set('type', event.event_type);
-  return {
+  // Safely set search parameters
+  try {
+    ogImageUrl.searchParams.set('title', event.title || 'Hackon Event');
+    if (eventDate) ogImageUrl.searchParams.set('date', eventDate);
+    if (locationDisplay) ogImageUrl.searchParams.set('location', locationDisplay);
+    if (event.event_type) ogImageUrl.searchParams.set('type', event.event_type);
+      // Pass TBA flags for better handling
+    if (event.date_tba) ogImageUrl.searchParams.set('date_tba', 'true');
+    if (event.time_tba) ogImageUrl.searchParams.set('time_tba', 'true');
+    if (event.venue_tba) ogImageUrl.searchParams.set('venue_tba', 'true');
+    
+    // Pass payment information
+    if (event.is_paid) ogImageUrl.searchParams.set('is_paid', 'true');
+    if (event.price && event.price > 0) ogImageUrl.searchParams.set('price', event.price.toString());
+  } catch (error) {
+    console.warn('Error setting OG image parameters:', error);
+  }
+
+  // Log for debugging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Generated OG Image URL:', ogImageUrl.toString());
+  }  return {
     title: eventTitle,
     description: eventDescription,
     openGraph: {
@@ -91,15 +139,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           url: ogImageUrl.toString(),
           width: 1200,
           height: 630,
-          alt: `${event.title} - Hackon Event`,
+          alt: `${event.title || 'Event'} - Hackon Event`,
           type: 'image/svg+xml',
         },
+        // Fallback to event image if available
         ...(event.image_url ? [{
           url: event.image_url,
           width: 800,
           height: 600,
-          alt: event.title,
+          alt: event.title || 'Event Image',
         }] : []),
+        // Ultimate fallback - default Hackon image
+        {
+          url: `${baseUrl}/api/og/event?title=Hackon%20Event`,
+          width: 1200,
+          height: 630,
+          alt: 'Hackon Event',
+        }
       ],
     },
     twitter: {
