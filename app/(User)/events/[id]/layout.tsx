@@ -127,47 +127,39 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   } catch (error) {
     console.warn('Error setting OG image parameters:', error);
   }
-
   // Log for debugging in development
   if (process.env.NODE_ENV === 'development') {
     console.log('Generated OG Image URL:', ogImageUrl.toString());
-  }  return {
+  }
+
+  // Determine the primary image to use
+  const primaryImageUrl = event.image_url || ogImageUrl.toString();
+  const primaryImageType = event.image_url ? 
+    (event.image_url.toLowerCase().includes('.png') ? 'image/png' : 'image/jpeg') : 
+    'image/png';
+
+  return {
     title: eventTitle,
     description: eventDescription,
     openGraph: {
       title: eventTitle,
       description: eventDescription,
-      type: 'website',      images: [
-        // Priority 1: Use event's specific image if available
-        ...(event.image_url ? [{
-          url: event.image_url,
-          width: 1200,
-          height: 630,
-          alt: event.title || 'Event Image',
-          type: 'image/jpeg',
-        }] : []),
-        // Priority 2: Generate dynamic OG image as fallback
+      type: 'website',
+      images: [
         {
-          url: ogImageUrl.toString(),
+          url: primaryImageUrl,
           width: 1200,
           height: 630,
-          alt: `${event.title || 'Event'} - Hackon Event`,
-          type: 'image/png',
-        },
-        // Priority 3: Ultimate fallback - default Hackon image
-        {
-          url: `${baseUrl}/api/og?title=Hackon%20Event`,
-          width: 1200,
-          height: 630,
-          alt: 'Hackon Event',
-          type: 'image/png',
+          alt: event.image_url ? (event.title || 'Event Image') : `${event.title || 'Event'} - Hackon Event`,
+          type: primaryImageType,
         }
       ],
-    },    twitter: {
+    },
+    twitter: {
       card: 'summary_large_image',
       title: eventTitle,
       description: eventDescription,
-      images: [event.image_url || ogImageUrl.toString()],
+      images: [primaryImageUrl],
     },
   };
 }
