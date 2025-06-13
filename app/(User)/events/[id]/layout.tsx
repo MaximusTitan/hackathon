@@ -91,21 +91,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   };
 
-  const locationDisplay = getLocationDisplay();
-
-  // Generate OG image URL with error handling
+  const locationDisplay = getLocationDisplay();  // Generate OG image URL with error handling
   const getBaseUrl = () => {
+    // For WhatsApp and social media crawlers, we need the absolute production URL
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, ''); // Remove trailing slash
+    }
+    // Vercel deployment URL (fallback)
     if (process.env.VERCEL_URL) {
       return `https://${process.env.VERCEL_URL}`;
     }
-    if (process.env.NEXT_PUBLIC_SITE_URL) {
-      return process.env.NEXT_PUBLIC_SITE_URL;
+    // Production fallback
+    if (process.env.NODE_ENV === 'production') {
+      return 'https://hackon.co';
     }
+    // Development - Note: WhatsApp won't work with localhost
     return 'http://localhost:3000';
   };
-
   const baseUrl = getBaseUrl();
-  const ogImageUrl = new URL('/api/og/event', baseUrl);
+  const ogImageUrl = new URL('/api/og', baseUrl);
   // Safely set search parameters
   try {
     ogImageUrl.searchParams.set('title', event.title || 'Hackon Event');
@@ -134,13 +138,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: eventTitle,
       description: eventDescription,
       type: 'website',
-      images: [
-        {
+      images: [        {
           url: ogImageUrl.toString(),
           width: 1200,
           height: 630,
           alt: `${event.title || 'Event'} - Hackon Event`,
-          type: 'image/svg+xml',
+          type: 'image/png',
         },
         // Fallback to event image if available
         ...(event.image_url ? [{
@@ -148,13 +151,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           width: 800,
           height: 600,
           alt: event.title || 'Event Image',
-        }] : []),
-        // Ultimate fallback - default Hackon image
+        }] : []),        // Ultimate fallback - default Hackon image
         {
-          url: `${baseUrl}/api/og/event?title=Hackon%20Event`,
+          url: `${baseUrl}/api/og?title=Hackon%20Event`,
           width: 1200,
           height: 630,
           alt: 'Hackon Event',
+          type: 'image/png',
         }
       ],
     },
