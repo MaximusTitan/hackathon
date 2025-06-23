@@ -101,6 +101,7 @@ export default function Home() {
           data = {};
         }        // Filter and sort events
         const currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0); // Set to start of today for proper date-only comparison
         const filteredEvents = (data.events || [])
           .filter((event: Event) => {
             // If any TBA field is true, treat as upcoming event
@@ -109,10 +110,11 @@ export default function Home() {
             }
             
             const eventDate = new Date(event.start_date || "");
+            eventDate.setHours(0, 0, 0, 0); // Set to start of event date for proper date-only comparison
             if (showPastEvents) {
               return eventDate < currentDate;
             } else {
-              return eventDate >= currentDate;
+              return eventDate >= currentDate; // Today's events are considered upcoming
             }
           })
           .sort((a: Event, b: Event) => {
