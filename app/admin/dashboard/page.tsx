@@ -86,19 +86,26 @@ export default function AdminDashboard() {
         
         const currentDate = new Date();
         const allEvents = data.events || [];
-        
-        // Split events into upcoming and past
+          // Split events into upcoming and past
         const { upcoming, past } = allEvents.reduce((acc: { upcoming: Event[], past: Event[] }, event: Event) => {
           // If any date field is TBA, treat as upcoming event
           if (event.date_tba || event.time_tba || event.venue_tba) {
             acc.upcoming.push(event);
-          } else {
-            const eventDate = new Date(event.start_date || "");
-            if (eventDate >= currentDate) {
+          } else if (event.start_date) {
+            // Use start_date for comparison, and include today's events as upcoming
+            const eventDate = new Date(event.start_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time to start of day
+            eventDate.setHours(0, 0, 0, 0); // Reset time to start of day
+            
+            if (eventDate >= today) {
               acc.upcoming.push(event);
             } else {
               acc.past.push(event);
             }
+          } else {
+            // If no start_date, treat as upcoming (safer default)
+            acc.upcoming.push(event);
           }
           return acc;
         }, { upcoming: [], past: [] });
@@ -305,8 +312,7 @@ export default function AdminDashboard() {
       setCreating(false);
       setUploading(false);
     }
-  }
-  const fetchEvents = async () => {
+  }  const fetchEvents = async () => {
     const res = await fetch("/api/events");
     const data = await res.json();
     
@@ -318,13 +324,21 @@ export default function AdminDashboard() {
       // If any date field is TBA, treat as upcoming event
       if (event.date_tba || event.time_tba || event.venue_tba) {
         acc.upcoming.push(event);
-      } else {
-        const eventDate = new Date(event.start_date || "");
-        if (eventDate >= currentDate) {
+      } else if (event.start_date) {
+        // Use start_date for comparison, and include today's events as upcoming
+        const eventDate = new Date(event.start_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        eventDate.setHours(0, 0, 0, 0); // Reset time to start of day
+        
+        if (eventDate >= today) {
           acc.upcoming.push(event);
         } else {
           acc.past.push(event);
         }
+      } else {
+        // If no start_date, treat as upcoming (safer default)
+        acc.upcoming.push(event);
       }
       return acc;
     }, { upcoming: [], past: [] });
