@@ -78,12 +78,9 @@ export async function GET(
             .from('screening_tests')
             .select('passing_score')
             .eq('id', registration.screening_test_id)
-            .single();
-
-          const passingScore = fullTestData?.passing_score || 70;
-          const scorePercentage = attemptData.total_questions > 0 
-            ? Math.round((attemptData.score / attemptData.total_questions) * 100)
-            : 0;
+            .single();          const passingScore = fullTestData?.passing_score || 70;
+          // Score is already stored as a percentage in the database
+          const scorePercentage = attemptData.score;
 
           test_result = {
             score: attemptData.score,

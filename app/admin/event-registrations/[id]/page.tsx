@@ -65,6 +65,42 @@ type EventRegistration = {
     email: string;
     linkedin: string | null;
   };
+  // Enhanced information
+  screening_test?: {
+    title: string;
+    passing_score: number;
+    timer_minutes: number;
+    total_questions: number;
+    mcq_link?: string;
+    deadline?: string;
+  } | null;
+  test_attempt?: {
+    id: string;
+    started_at: string;
+    submitted_at: string;
+    score: number;
+    total_questions: number;
+    score_percentage: number;
+    passed: boolean;
+    time_taken_seconds: number;
+    status: string;
+    tab_switches: number;
+  } | null;
+  all_test_attempts?: Array<{
+    id: string;
+    started_at: string;
+    submitted_at: string;
+    score: number;
+    total_questions: number;
+    score_percentage: number;
+    time_taken_seconds: number;
+    status: string;
+    tab_switches: number;
+  }>;
+  award_assigned_by_admin?: {
+    name: string;
+    email: string;
+  } | null;
 };
 
 type ScreeningTest = {
@@ -106,9 +142,10 @@ export default function EventRegistrationsPage() {
   });  const [submittingScreening, setSubmittingScreening] = useState(false);
   const [showAwardDialog, setShowAwardDialog] = useState(false);const [selectedForAward, setSelectedForAward] = useState<string>('');
   const [awardType, setAwardType] = useState<'winner' | 'runner_up'>('winner');
-  const [assigningAward, setAssigningAward] = useState(false);
-  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [assigningAward, setAssigningAward] = useState(false);  const [showNotesDialog, setShowNotesDialog] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<string>('');
+  const [showMemberDetailDialog, setShowMemberDetailDialog] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<EventRegistration | null>(null);
   const [updatingStartButton, setUpdatingStartButton] = useState(false);
   const router = useRouter();
 
@@ -328,10 +365,21 @@ export default function EventRegistrationsPage() {
       toast.error('Error removing award');
     }
   };
-
   const handleShowNotes = (notes: string) => {
     setSelectedNotes(notes);
     setShowNotesDialog(true);
+  };
+
+  const handleShowMemberDetail = (member: EventRegistration) => {
+    setSelectedMember(member);
+    setShowMemberDetailDialog(true);
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!seconds) return 'N/A';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -822,17 +870,19 @@ export default function EventRegistrationsPage() {
                           }
                         }}
                       />
-                    </TableHead>
-                    <TableHead>So. No.</TableHead>
+                    </TableHead>                    <TableHead>So. No.</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>LinkedIn</TableHead>
+                    <TableHead>Payment</TableHead>
                     <TableHead>Registered On</TableHead>
                     <TableHead>Attended</TableHead>
                     <TableHead>Screening Status</TableHead>
+                    <TableHead>Test Score</TableHead>
                     <TableHead>Presentation Status</TableHead>
                     <TableHead>Award Status</TableHead>
                     <TableHead>Project Links</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -853,8 +903,7 @@ export default function EventRegistrationsPage() {
                       </TableCell>
                       <TableCell className="px-4 py-2 text-sm text-gray-700">{idx + 1}</TableCell>
                       <TableCell className="font-medium">{reg.user?.name || "N/A"}</TableCell>
-                      <TableCell>{reg.user?.email || "N/A"}</TableCell>
-                      <TableCell>
+                      <TableCell>{reg.user?.email || "N/A"}</TableCell>                      <TableCell>
                         {reg.user?.linkedin ? (
                           <a 
                             href={reg.user.linkedin}
@@ -868,15 +917,59 @@ export default function EventRegistrationsPage() {
                           "N/A"
                         )}
                       </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {reg.payment_id ? (
+                            <div>
+                              <div className="text-green-600 font-medium">Paid</div>
+                              <div className="text-xs text-gray-500">₹{reg.amount_paid || 0}</div>
+                              {reg.order_id && <div className="text-xs text-gray-400">{reg.order_id.slice(0, 8)}...</div>}
+                            </div>
+                          ) : reg.amount_paid === 0 ? (
+                            <span className="text-blue-600 font-medium">Free</span>
+                          ) : (
+                            <span className="text-red-600 font-medium">Unpaid</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{formatDate(reg.registered_at)}</TableCell>
                       <TableCell>
                         <Checkbox
                           checked={reg.attended || false}
                           onCheckedChange={(checked) => updateAttendance(reg.id, checked as boolean)}
                         />
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(reg.screening_status || 'pending')}
+                      </TableCell>                      <TableCell>
+                        <div className="space-y-1">
+                          {getStatusBadge(reg.screening_status || 'pending')}
+                          {reg.screening_test && (
+                            <div className="text-xs text-gray-500">
+                              {reg.screening_test.title}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>                      <TableCell>
+                        {reg.test_attempt ? (
+                          <div className="text-sm">
+                            <div className={`font-medium ${reg.test_attempt.passed ? 'text-green-600' : 'text-red-600'}`}>
+                              {reg.test_attempt.score_percentage}%
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {Math.round((reg.test_attempt.score_percentage * reg.test_attempt.total_questions) / 100)}/{reg.test_attempt.total_questions} correct
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {formatTime(reg.test_attempt.time_taken_seconds)}
+                            </div>
+                            {reg.test_attempt.tab_switches > 0 && (
+                              <div className="text-xs text-orange-600">
+                                {reg.test_attempt.tab_switches} tab switches
+                              </div>
+                            )}
+                          </div>
+                        ) : reg.screening_status === 'completed' ? (
+                          <span className="text-gray-500 text-sm">Score N/A</span>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {getStatusBadge(reg.presentation_status || 'pending')}
@@ -958,10 +1051,19 @@ export default function EventRegistrationsPage() {
                                 </button>
                               </div>
                             )}
-                          </div>
-                        ) : (
+                          </div>                        ) : (
                           <span className="text-gray-400 text-sm">—</span>
                         )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          onClick={() => handleShowMemberDetail(reg)}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          View Details
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -970,6 +1072,365 @@ export default function EventRegistrationsPage() {
           )}
         </>
       )}
+
+      {/* Member Details Dialog */}
+      <Dialog open={showMemberDetailDialog} onOpenChange={setShowMemberDetailDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Complete Member Information</DialogTitle>
+            <DialogDescription>
+              Comprehensive details for {selectedMember?.user?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMember && (
+            <div className="mt-4 max-h-[75vh] overflow-y-auto space-y-6">
+              
+              {/* Basic Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Name</Label>
+                    <p className="text-sm text-gray-900">{selectedMember.user.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Email</Label>
+                    <p className="text-sm text-gray-900">{selectedMember.user.email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">LinkedIn</Label>
+                    {selectedMember.user.linkedin ? (
+                      <a 
+                        href={selectedMember.user.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        View Profile <ExternalLink className="w-3 h-3" />
+                      </a>
+                    ) : (
+                      <p className="text-sm text-gray-500">Not provided</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Registration Date</Label>
+                    <p className="text-sm text-gray-900">{formatDate(selectedMember.registered_at)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Payment Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Payment Information</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Payment Status</Label>
+                    <p className={`text-sm font-medium ${
+                      selectedMember.payment_id ? 'text-green-600' : 
+                      selectedMember.amount_paid === 0 ? 'text-blue-600' : 'text-red-600'
+                    }`}>
+                      {selectedMember.payment_id ? 'Paid' : 
+                       selectedMember.amount_paid === 0 ? 'Free Event' : 'Unpaid'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Amount</Label>
+                    <p className="text-sm text-gray-900">₹{selectedMember.amount_paid || 0}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Payment ID</Label>
+                    <p className="text-sm text-gray-900">{selectedMember.payment_id || 'N/A'}</p>
+                  </div>
+                  {selectedMember.order_id && (
+                    <div className="col-span-3">
+                      <Label className="text-sm font-medium text-gray-700">Order ID</Label>
+                      <p className="text-sm text-gray-900 font-mono">{selectedMember.order_id}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Screening Test Information */}
+              {selectedMember.screening_test && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Screening Test Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Test Title</Label>
+                        <p className="text-sm text-gray-900">{selectedMember.screening_test.title}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Status</Label>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(selectedMember.screening_status || 'pending')}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Total Questions</Label>
+                        <p className="text-sm text-gray-900">{selectedMember.screening_test.total_questions}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Time Limit</Label>
+                        <p className="text-sm text-gray-900">{selectedMember.screening_test.timer_minutes} minutes</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Passing Score</Label>
+                        <p className="text-sm text-gray-900">{selectedMember.screening_test.passing_score}%</p>
+                      </div>
+                      {selectedMember.screening_test.deadline && (
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700">Deadline</Label>
+                          <p className="text-sm text-gray-900">{formatDate(selectedMember.screening_test.deadline)}</p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedMember.screening_test.mcq_link && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">External Test Link</Label>
+                        <a 
+                          href={selectedMember.screening_test.mcq_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          Open Test <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Test Attempt Results */}
+              {selectedMember.test_attempt && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Latest Test Attempt</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Score</Label>
+                        <p className={`text-lg font-bold ${
+                          selectedMember.test_attempt.passed ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {selectedMember.test_attempt.score_percentage}% 
+                          {selectedMember.test_attempt.passed ? ' (PASS)' : ' (FAIL)'}
+                        </p>                        <p className="text-sm text-gray-500">
+                          {Math.round((selectedMember.test_attempt.score_percentage * selectedMember.test_attempt.total_questions) / 100)}/{selectedMember.test_attempt.total_questions} correct
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Time Taken</Label>
+                        <p className="text-sm text-gray-900">{formatTime(selectedMember.test_attempt.time_taken_seconds)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Tab Switches</Label>
+                        <p className={`text-sm font-medium ${
+                          selectedMember.test_attempt.tab_switches > 0 ? 'text-orange-600' : 'text-green-600'
+                        }`}>
+                          {selectedMember.test_attempt.tab_switches}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Started At</Label>
+                        <p className="text-sm text-gray-900">{formatDate(selectedMember.test_attempt.started_at)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Submitted At</Label>
+                        <p className="text-sm text-gray-900">{formatDate(selectedMember.test_attempt.submitted_at)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Status</Label>
+                        <p className="text-sm text-gray-900 capitalize">{selectedMember.test_attempt.status.replace('_', ' ')}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* All Test Attempts */}
+              {selectedMember.all_test_attempts && selectedMember.all_test_attempts.length > 1 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">All Test Attempts ({selectedMember.all_test_attempts.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedMember.all_test_attempts.map((attempt, index) => (
+                        <div key={attempt.id} className="border rounded-lg p-3 bg-gray-50">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-sm">Attempt #{index + 1}</h4>
+                            <span className={`text-sm font-medium ${
+                              attempt.score_percentage && attempt.score_percentage >= (selectedMember.screening_test?.passing_score || 70) 
+                                ? 'text-green-600' 
+                                : 'text-red-600'
+                            }`}>
+                              {attempt.score_percentage}%
+                            </span>
+                          </div>                          <div className="grid grid-cols-4 gap-2 text-xs text-gray-600">
+                            <div>Score: {Math.round((attempt.score_percentage * attempt.total_questions) / 100)}/{attempt.total_questions}</div>
+                            <div>Time: {formatTime(attempt.time_taken_seconds)}</div>
+                            <div>Tabs: {attempt.tab_switches}</div>
+                            <div>Status: {attempt.status}</div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Started: {formatDate(attempt.started_at)} | 
+                            {attempt.submitted_at && ` Submitted: ${formatDate(attempt.submitted_at)}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Project Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Project Submission</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Presentation Status</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      {getStatusBadge(selectedMember.presentation_status || 'pending')}
+                    </div>
+                  </div>
+                  
+                  {(selectedMember.github_link || selectedMember.deployment_link || selectedMember.presentation_link) && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700">Project Links</Label>
+                      <div className="space-y-2">
+                        {selectedMember.github_link && (
+                          <div>
+                            <Label className="text-xs text-gray-600">GitHub Repository</Label>
+                            <a
+                              href={selectedMember.github_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              {selectedMember.github_link} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
+                        {selectedMember.deployment_link && (
+                          <div>
+                            <Label className="text-xs text-gray-600">Live Demo</Label>
+                            <a
+                              href={selectedMember.deployment_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-green-600 hover:underline flex items-center gap-1"
+                            >
+                              {selectedMember.deployment_link} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
+                        {selectedMember.presentation_link && (
+                          <div>
+                            <Label className="text-xs text-gray-600">Presentation</Label>
+                            <a
+                              href={selectedMember.presentation_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-purple-600 hover:underline flex items-center gap-1"
+                            >
+                              {selectedMember.presentation_link} <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedMember.presentation_notes && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Presentation Notes</Label>
+                      <div className="mt-1 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                        {selectedMember.presentation_notes}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Award Information */}
+              {selectedMember.award_type && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Award Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Award Type</Label>
+                        <div className="flex items-center gap-2 mt-1">
+                          {selectedMember.award_type === 'winner' ? (
+                            <>
+                              <Trophy className="w-5 h-5 text-yellow-600" />
+                              <span className="text-yellow-600 font-semibold">Winner</span>
+                            </>
+                          ) : (
+                            <>
+                              <Medal className="w-5 h-5 text-gray-600" />
+                              <span className="text-gray-600 font-semibold">Runner-up</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Assigned At</Label>
+                        <p className="text-sm text-gray-900">{selectedMember.award_assigned_at ? formatDate(selectedMember.award_assigned_at) : 'N/A'}</p>
+                      </div>
+                    </div>
+                    {selectedMember.award_assigned_by_admin && (
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700">Assigned By</Label>
+                        <p className="text-sm text-gray-900">
+                          {selectedMember.award_assigned_by_admin.name} ({selectedMember.award_assigned_by_admin.email})
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Event Participation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Event Participation</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Attendance Status</Label>
+                    <p className={`text-sm font-medium ${selectedMember.attended ? 'text-green-600' : 'text-red-600'}`}>
+                      {selectedMember.attended ? 'Attended' : 'Not Attended'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">User ID</Label>
+                    <p className="text-sm text-gray-900 font-mono">{selectedMember.user_id}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowMemberDetailDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Notes Dialog */}
       <Dialog open={showNotesDialog} onOpenChange={setShowNotesDialog}>

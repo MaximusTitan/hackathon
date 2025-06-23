@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -34,6 +34,29 @@ export default function MCQTestTaker({
   const [tabSwitches, setTabSwitches] = useState(0);
   const [testStartTime, setTestStartTime] = useState<Date>(new Date());
   const [hasLeft, setHasLeft] = useState(false);
+  
+  // Ref for scrolling to questions
+  const questionCardRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to first question when component mounts
+  useEffect(() => {
+    if (questionCardRef.current) {
+      questionCardRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }
+  }, []);
+
+  // Scroll to question when question index changes
+  useEffect(() => {
+    if (questionCardRef.current) {
+      questionCardRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'start' 
+      });
+    }
+  }, [currentQuestionIndex]);
 
   // Tab visibility detection
   useEffect(() => {
@@ -123,7 +146,10 @@ export default function MCQTestTaker({
       console.error('Error submitting test:', error);
       toast.error("Error submitting test");
     }
-  }, [testId, eventId, answers, tabSwitches, timeRemaining, testStartTime, isSubmitting, hasLeft, onTestComplete]);
+  }, [testId, eventId, answers, tabSwitches, timeRemaining, testStartTime, isSubmitting, hasLeft, onTestComplete]);  const handleQuestionNavigation = (index: number) => {
+    setCurrentQuestionIndex(index);
+    // Scroll will be handled by the useEffect for currentQuestionIndex change
+  };
 
   const handleAnswerSelect = (questionId: string, optionIndex: number) => {
     setAnswers(prev => ({ ...prev, [questionId]: optionIndex }));
@@ -243,11 +269,9 @@ export default function MCQTestTaker({
             <Progress value={progress} className="h-2" />
           </div>
         </div>
-      </div>
-
-      {/* Main Content */}
+      </div>      {/* Main Content */}
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Card className="mb-6">
+        <Card className="mb-6" ref={questionCardRef}>
           <CardHeader>
             <CardTitle className="text-lg">
               Question {currentQuestionIndex + 1} ({currentQuestion.points} point{currentQuestion.points !== 1 ? 's' : ''})
@@ -334,11 +358,10 @@ export default function MCQTestTaker({
             <CardTitle className="text-sm">Question Navigator</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-10 gap-2">
-              {questions.map((q, index) => (
+            <div className="grid grid-cols-10 gap-2">              {questions.map((q, index) => (
                 <button
                   key={q.id}
-                  onClick={() => setCurrentQuestionIndex(index)}
+                  onClick={() => handleQuestionNavigation(index)}
                   className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
                     index === currentQuestionIndex
                       ? 'bg-blue-600 text-white'
