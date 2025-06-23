@@ -70,13 +70,8 @@ export default function EventDetailsPage() {
   const [participantsLoading, setParticipantsLoading] = useState(true);
   const [winners, setWinners] = useState<Participant[]>([]);
   const [runnersUp, setRunnersUp] = useState<Participant[]>([]);  const [winnersLoading, setWinnersLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [recruitingPartnersKey, setRecruitingPartnersKey] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);  const [recruitingPartnersKey, setRecruitingPartnersKey] = useState(0);
   const router = useRouter();const supabase = createClientComponentClient();
-
-  // Check if event is in the past
-  const isEventPast = event && event.start_date ? 
-    new Date(event.start_date) < new Date() : false;
 
   // Function to determine if param is an ID (UUID) or title slug
   const isUUID = (str: string) => {
@@ -581,7 +576,7 @@ export default function EventDetailsPage() {
                   <div>                    <h3 className="font-medium text-gray-900">Virtual Event</h3>
                     <p className="text-gray-700">This event will be held online</p>
 
-                    {event.meeting_link && !isEventPast && (
+                    {event.meeting_link && (
                       <a
                         href={event.meeting_link}
                         target="_blank"
@@ -618,11 +613,8 @@ export default function EventDetailsPage() {
                 onPartnersUpdate={() => setRecruitingPartnersKey(prev => prev + 1)}
               />
             )}
-          </Suspense>
-
-          {/* Registration Button */}
-          {!isEventPast && (
-            <div className="mt-8 mb-8 flex flex-col sm:flex-row gap-3">
+          </Suspense>          {/* Registration Button */}
+          <div className="mt-8 mb-8 flex flex-col sm:flex-row gap-3">
               {!user ? (
                 <>
                   <button
@@ -689,10 +681,10 @@ export default function EventDetailsPage() {
                     <Share2 className="w-4 h-4" />
                     Share Event
                   </button>
-                </>
-              )}
+                </>              )}
             </div>
-          )}          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
+
+          {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
           <Suspense fallback={<div className="mb-8 h-48 bg-gray-100 rounded-lg animate-pulse"></div>}>
             <PastEventGallery eventId={event?.id || ""} isAdmin={isAdmin} />
           </Suspense>

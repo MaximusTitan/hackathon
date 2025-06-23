@@ -47,10 +47,10 @@ export async function GET(
 
     if (regError) {
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
-    }
-
-    // Get screening test if applicable
+    }    // Get screening test if applicable
     let screening_test = null;
+    let test_result = null;
+    
     if (registration.screening_test_id) {
       const { data: testData } = await supabase
         .from('screening_tests')
@@ -59,12 +59,48 @@ export async function GET(
         .single();
       
       screening_test = testData;
+
+      // Get test result if user has completed the test
+      if (registration.screening_status === 'completed') {
+        const { data: attemptData } = await supabase
+          .from('user_test_attempts')
+          .select('score, total_questions, submitted_at')
+          .eq('user_id', session.user.id)
+          .eq('screening_test_id', registration.screening_test_id)
+          .eq('status', 'submitted')
+          .order('submitted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (attemptData && testData) {
+          // Get the passing score from screening test
+          const { data: fullTestData } = await supabase
+            .from('screening_tests')
+            .select('passing_score')
+            .eq('id', registration.screening_test_id)
+            .single();
+
+          const passingScore = fullTestData?.passing_score || 70;
+          const scorePercentage = attemptData.total_questions > 0 
+            ? Math.round((attemptData.score / attemptData.total_questions) * 100)
+            : 0;
+
+          test_result = {
+            score: attemptData.score,
+            total_questions: attemptData.total_questions,
+            passing_score: passingScore,
+            passed: scorePercentage >= passingScore,
+            submitted_at: attemptData.submitted_at
+          };
+        }
+      }
     }
 
     return NextResponse.json({
       event,
       registration,
-      screening_test
+      screening_test,
+      test_result
     });
   } catch (error) {
     console.error("Error fetching workflow data:", error);

@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/card";
 import { ArrowLeft, Send, Clock, CheckCircle, FileText, Users, ExternalLink, Trophy, Medal } from "lucide-react";
 import { toast } from "sonner";
+import MCQTestCreator from "@/components/admin/MCQTestCreator";
+import { MCQQuestion } from "@/types/screening";
 
 type EventRegistration = {
   id: string;
@@ -68,10 +70,15 @@ type EventRegistration = {
 type ScreeningTest = {
   id: string;
   event_id: string;
-  mcq_link: string;
+  title?: string;
+  mcq_link?: string;
   instructions: string;
   deadline: string | null;
   is_active: boolean;
+  timer_minutes?: number;
+  total_questions?: number;
+  passing_score?: number;
+  questions?: MCQQuestion[];
 };
 
 type Event = {
@@ -89,15 +96,15 @@ export default function EventRegistrationsPage() {
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<Event | null>(null);
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
-  const [screeningTest, setScreeningTest] = useState<ScreeningTest | null>(null);
-  const [showScreeningDialog, setShowScreeningDialog] = useState(false);
+  const [screeningTest, setScreeningTest] = useState<ScreeningTest | null>(null);  const [showScreeningDialog, setShowScreeningDialog] = useState(false);
+  const [showMCQCreator, setShowMCQCreator] = useState(false);
+  const [showMCQSender, setShowMCQSender] = useState(false);
   const [screeningForm, setScreeningForm] = useState({
     mcq_link: '',
     instructions: 'Please complete this screening test within the given deadline.',
     deadline: ''
-  });
-  const [submittingScreening, setSubmittingScreening] = useState(false);
-  const [showAwardDialog, setShowAwardDialog] = useState(false);  const [selectedForAward, setSelectedForAward] = useState<string>('');
+  });  const [submittingScreening, setSubmittingScreening] = useState(false);
+  const [showAwardDialog, setShowAwardDialog] = useState(false);const [selectedForAward, setSelectedForAward] = useState<string>('');
   const [awardType, setAwardType] = useState<'winner' | 'runner_up'>('winner');
   const [assigningAward, setAssigningAward] = useState(false);
   const [showNotesDialog, setShowNotesDialog] = useState(false);
@@ -125,13 +132,12 @@ export default function EventRegistrationsPage() {
         }
 
         // Fetch existing screening test
-        const screeningRes = await fetch(`/api/admin/screening-test?event_id=${eventId}`);
-        if (screeningRes.ok) {
+        const screeningRes = await fetch(`/api/admin/screening-test?event_id=${eventId}`);        if (screeningRes.ok) {
           const screeningData = await screeningRes.json();
           if (screeningData.screeningTest) {
             setScreeningTest(screeningData.screeningTest);
             setScreeningForm({
-              mcq_link: screeningData.screeningTest.mcq_link,
+              mcq_link: screeningData.screeningTest.mcq_link || '',
               instructions: screeningData.screeningTest.instructions,
               deadline: screeningData.screeningTest.deadline ? 
                 new Date(screeningData.screeningTest.deadline).toISOString().slice(0, 16) : ''
@@ -389,6 +395,85 @@ export default function EventRegistrationsPage() {
     } finally {
       setUpdatingStartButton(false);
     }
+  };  const handleSaveMCQTest = async (testData: any) => {
+    setSubmittingScreening(true);
+
+    try {
+      const res = await fetch('/api/admin/save-mcq-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          ...testData
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        toast.success('MCQ test saved successfully');
+        setShowMCQCreator(false);
+        
+        // Refresh screening test data
+        const screeningRes = await fetch(`/api/admin/screening-test?event_id=${eventId}`);
+        if (screeningRes.ok) {
+          const screeningData = await screeningRes.json();
+          if (screeningData.screeningTest) {
+            setScreeningTest(screeningData.screeningTest);
+          }
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to save MCQ test');
+      }
+    } catch (error) {
+      console.error('Error saving MCQ test:', error);
+      toast.error('Error saving MCQ test');
+    } finally {
+      setSubmittingScreening(false);
+    }
+  };
+
+  const handleSendMCQTest = async (testId: string) => {
+    if (selectedAttendees.length === 0) {
+      toast.error('Please select attendees to send the MCQ test');
+      return;
+    }
+
+    setSubmittingScreening(true);
+
+    try {
+      const res = await fetch('/api/admin/send-mcq-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          registration_ids: selectedAttendees,
+          test_id: testId
+        })
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        toast.success('MCQ test sent successfully');
+        setShowMCQSender(false);
+        setSelectedAttendees([]);
+        
+        // Refresh registrations
+        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setRegistrations(refreshData.registrations);
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to send MCQ test');
+      }
+    } catch (error) {
+      console.error('Error sending MCQ test:', error);
+      toast.error('Error sending MCQ test');
+    } finally {
+      setSubmittingScreening(false);
+    }
   };
 
   return (
@@ -511,8 +596,30 @@ export default function EventRegistrationsPage() {
           {/* Action Buttons */}
           {attendedRegistrations.length > 0 && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-3">Screening Test Management</h3>
-              <div className="flex flex-wrap gap-3">
+              <h3 className="font-semibold text-blue-900 mb-3">Screening Test Management</h3>              <div className="flex flex-wrap gap-3">
+                <Button 
+                  onClick={() => setShowMCQCreator(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  disabled={canSelectForScreening.length === 0}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 
+                    ? 'Edit MCQ Test' 
+                    : 'Create MCQ Test'
+                  }
+                </Button>
+
+                {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 && (
+                  <Button 
+                    onClick={() => setShowMCQSender(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={canSelectForScreening.length === 0 || selectedAttendees.length === 0}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Send MCQ Test ({screeningTest.questions.length} questions)
+                  </Button>
+                )}
+                
                 <Dialog open={showScreeningDialog} onOpenChange={setShowScreeningDialog}>
                   <DialogTrigger asChild>
                     <Button 
@@ -520,7 +627,7 @@ export default function EventRegistrationsPage() {
                       disabled={canSelectForScreening.length === 0}
                     >
                       <Send className="mr-2 h-4 w-4" />
-                      Send Screening Test
+                      Send External Test Link
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
@@ -593,9 +700,11 @@ export default function EventRegistrationsPage() {
                   <Clock className="mr-2 h-4 w-4" />
                   Skip Screening for Selected
                 </Button>
-              </div>
-              <p className="text-blue-700 text-sm mt-2">
-                Select attendees from the table below to send screening tests or skip the screening step.
+              </div>              <p className="text-blue-700 text-sm mt-2">
+                {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 
+                  ? 'First select participants, then click "Send MCQ Test" to distribute the saved test. You can also edit the existing test or create external test links.'
+                  : 'Select attendees from the table below to create an integrated MCQ test or send external test links.'
+                }
               </p>
             </div>
           )}
@@ -882,6 +991,94 @@ export default function EventRegistrationsPage() {
               variant="outline"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>      </Dialog>
+
+      {/* MCQ Test Creator Dialog */}
+      <Dialog open={showMCQCreator} onOpenChange={setShowMCQCreator}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create MCQ Screening Test</DialogTitle>
+            <DialogDescription>
+              Create an integrated MCQ test for selected attendees ({selectedAttendees.length} selected)
+            </DialogDescription>
+          </DialogHeader>          <MCQTestCreator
+            eventId={eventId || ''}
+            existingTest={screeningTest ? {
+              id: screeningTest.id,
+              title: screeningTest.title,
+              instructions: screeningTest.instructions,
+              timer_minutes: screeningTest.timer_minutes || 30,
+              passing_score: screeningTest.passing_score || 70,
+              questions: screeningTest.questions || []
+            } : null}
+            onSave={handleSaveMCQTest}
+            isSubmitting={submittingScreening}
+            mode={screeningTest ? 'edit' : 'create'}
+          />        </DialogContent>
+      </Dialog>
+
+      {/* MCQ Test Sender Dialog */}
+      <Dialog open={showMCQSender} onOpenChange={setShowMCQSender}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Send MCQ Test to Participants</DialogTitle>
+            <DialogDescription>
+              Review and send the saved MCQ test to selected attendees ({selectedAttendees.length} selected)
+            </DialogDescription>
+          </DialogHeader>
+          
+          {screeningTest && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Test Overview</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Title:</span> {screeningTest.title || 'Screening Test'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Questions:</span> {screeningTest.questions?.length || 0}
+                  </div>
+                  <div>
+                    <span className="font-medium">Time Limit:</span> {screeningTest.timer_minutes || 30} minutes
+                  </div>
+                  <div>
+                    <span className="font-medium">Passing Score:</span> {screeningTest.passing_score || 70}%
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <span className="font-medium">Instructions:</span>
+                  <p className="text-gray-700 mt-1">{screeningTest.instructions}</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-2">Selected Participants ({selectedAttendees.length})</h4>
+                <div className="text-sm text-blue-800">
+                  {registrations
+                    .filter(reg => selectedAttendees.includes(reg.id))
+                    .map(reg => reg.user.name)
+                    .join(', ')
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowMCQSender(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => screeningTest && handleSendMCQTest(screeningTest.id)}
+              disabled={submittingScreening || selectedAttendees.length === 0}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {submittingScreening ? 'Sending...' : 'Send MCQ Test'}
             </Button>
           </DialogFooter>
         </DialogContent>

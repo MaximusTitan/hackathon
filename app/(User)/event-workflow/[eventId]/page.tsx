@@ -13,8 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, ExternalLink, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, CheckCircle, Clock, AlertCircle, Play, FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
+import TestInstructionsModal from "@/components/TestInstructionsModal";
+import MCQTestTaker from "@/components/MCQTestTaker";
+import TestResults from "@/components/TestResults";
+import { TestInstructions, MCQQuestion } from "@/types/screening";
 
 type WorkflowData = {
   event: {
@@ -37,12 +41,18 @@ type WorkflowData = {
     instructions: string;
     deadline: string | null;
   } | null;
+  test_result?: {
+    score: number;
+    total_questions: number;
+    passing_score: number;
+    passed: boolean;
+    submitted_at: string;
+  } | null;
 };
 
 export default function EventWorkflowPage() {
   const params = useParams();
-  const eventId = Array.isArray(params?.eventId) ? params.eventId[0] : params?.eventId;
-  const [workflowData, setWorkflowData] = useState<WorkflowData | null>(null);
+  const eventId = Array.isArray(params?.eventId) ? params.eventId[0] : params?.eventId;  const [workflowData, setWorkflowData] = useState<WorkflowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [presentationForm, setPresentationForm] = useState({
@@ -51,6 +61,24 @@ export default function EventWorkflowPage() {
     presentation_link: '',
     presentation_notes: ''
   });
+  
+  // MCQ Test states
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [takingTest, setTakingTest] = useState(false);
+  const [testData, setTestData] = useState<{
+    test: {
+      id: string;
+      instructions: string;
+      timer_minutes: number;
+      total_questions: number;
+      passing_score: number;
+      questions: MCQQuestion[];
+    };
+    registration_id: string;
+  } | null>(null);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [showTestResults, setShowTestResults] = useState(false);
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -145,14 +173,162 @@ export default function EventWorkflowPage() {
     }
   };
 
+  const handleTakeTest = async () => {
+    try {
+      const res = await fetch(`/api/user/get-screening-test?event_id=${eventId}`);
+      const data = await res.json();
+      
+      if (res.ok) {
+        setTestData(data);
+        
+        const instructions: TestInstructions = {
+          title: "Screening Test Instructions",
+          duration: data.test.timer_minutes,
+          totalQuestions: data.test.total_questions,
+          passingScore: data.test.passing_score,
+          rules: [
+            "You must complete the test within the allocated time limit",
+            "Do not leave this browser tab or window during the test",
+            "Switching tabs more than 3 times will result in automatic submission",
+            "Each question must be answered before moving to the next",
+            "You can navigate between questions using the navigation buttons",
+            "Once submitted, you cannot retake the test",
+            "Ensure you have a stable internet connection",
+            "Do not refresh the page during the test"
+          ]
+        };
+        
+        setShowInstructions(true);
+      } else {
+        toast.error(data.error || "Failed to load test");
+      }
+    } catch (error) {
+      console.error("Error loading test:", error);
+      toast.error("Error loading test");
+    }
+  };
+
+  const handleStartTest = async () => {
+    if (!testData) return;
+    
+    try {
+      const res = await fetch('/api/user/start-screening-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          screening_test_id: testData.test.id,
+          event_id: eventId
+        })
+      });
+
+      if (res.ok) {
+        setShowInstructions(false);
+        setTakingTest(true);
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to start test");
+      }
+    } catch (error) {
+      console.error("Error starting test:", error);
+      toast.error("Error starting test");
+    }
+  };
+
+  const handleTestComplete = (result: any) => {
+    setTakingTest(false);
+    setTestResult(result);
+    setShowTestResults(true);
+    
+    // Refresh workflow data
+    const refreshWorkflow = async () => {
+      try {
+        const res = await fetch(`/api/user/event-workflow/${eventId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setWorkflowData(data);
+        }
+      } catch (error) {
+        console.error("Error refreshing workflow:", error);
+      }
+    };
+    
+    refreshWorkflow();
+  };
+
+  const handleTestExit = () => {
+    setTakingTest(false);
+    setTestData(null);
+    setShowInstructions(false);
+  };
+  const handleResultsContinue = () => {
+    setShowTestResults(false);
+    setTestResult(null);
+  };
+  // Helper function to determine if Step 2 (Presentation) should be shown
+  const shouldShowStep2 = () => {
+    if (!workflowData) return false;
+    
+    const { registration, test_result } = workflowData;
+    
+    // Hide Step 2 if no screening test is assigned (pending status with no test)
+    if (registration.screening_status === 'pending') return false;
+    
+    // Show Step 2 if:
+    // 1. Screening is skipped by admin
+    if (registration.screening_status === 'skipped') return true;
+    
+    // 2. Screening is completed and user passed
+    if (registration.screening_status === 'completed' && test_result?.passed) return true;
+    
+    // Hide Step 2 if user failed the test or test is only sent but not completed
+    return false;
+  };
+
+  const getScreeningStatusMessage = () => {
+    if (!workflowData) return '';
+    
+    const { registration, test_result } = workflowData;
+    
+    switch (registration.screening_status) {
+      case 'pending':
+        return 'Waiting for screening test assignment';
+      case 'sent':
+        return 'Screening test available - please complete it';
+      case 'completed':
+        if (test_result) {
+          const scorePercentage = test_result.total_questions > 0 
+            ? Math.round((test_result.score / test_result.total_questions) * 100)
+            : 0;
+          
+          if (test_result.passed) {
+            return `✅ Passed with ${scorePercentage}% (Required: ${test_result.passing_score}%)`;
+          } else {
+            return `❌ Failed with ${scorePercentage}% (Required: ${test_result.passing_score}%)`;
+          }
+        }
+        return 'Completed';      case 'skipped':
+        return '⏭️ Skipped by admin - proceed to next step';
+      default:
+        return String(registration.screening_status).charAt(0).toUpperCase() + String(registration.screening_status).slice(1);
+    }
+  };
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
       case 'submitted':
-      case 'skipped':
+        // For completed screening, check if user passed
+        if (status === 'completed' && workflowData?.test_result) {
+          return workflowData.test_result.passed 
+            ? <CheckCircle className="w-5 h-5 text-green-600" />
+            : <AlertCircle className="w-5 h-5 text-red-600" />;
+        }
         return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'skipped':
+        return <CheckCircle className="w-5 h-5 text-orange-600" />;
       case 'sent':
         return <Clock className="w-5 h-5 text-blue-600" />;
+      case 'reviewed':
+        return <CheckCircle className="w-5 h-5 text-purple-600" />;
       default:
         return <AlertCircle className="w-5 h-5 text-gray-400" />;
     }
@@ -180,7 +356,7 @@ export default function EventWorkflowPage() {
     );
   }
 
-  const { event, registration, screening_test } = workflowData;
+  const { event, registration, screening_test, test_result } = workflowData;
 
   // Check if user attended
   if (!registration.attended) {
@@ -233,18 +409,16 @@ export default function EventWorkflowPage() {
       <div className="space-y-6">
         {/* Step 1: Screening Test */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              {getStatusIcon(registration.screening_status)}
-              <div>
-                <CardTitle>Step 1: Screening Test</CardTitle>
-                <CardDescription>
-                  Status: {registration.screening_status.charAt(0).toUpperCase() + registration.screening_status.slice(1)}
-                </CardDescription>
+          <CardHeader>              <div className="flex items-center gap-3">
+                {getStatusIcon(registration.screening_status)}
+                <div>
+                  <CardTitle>Step 1: Screening Test</CardTitle>
+                  <CardDescription>
+                    {getScreeningStatusMessage()}
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
+          </CardHeader>          <CardContent>
             {registration.screening_status === 'sent' && screening_test ? (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
@@ -256,28 +430,63 @@ export default function EventWorkflowPage() {
                     </p>
                   )}
                 </div>
+                
                 <div className="flex gap-3">
-                  <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <a 
-                      href={screening_test.mcq_link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2"
+                  {/* Check if it's an integrated MCQ test or external link */}
+                  {screening_test.mcq_link ? (
+                    // External test link
+                    <>
+                      <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <a 
+                          href={screening_test.mcq_link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Take External Test
+                        </a>
+                      </Button>
+                      <Button 
+                        onClick={handleScreeningComplete}
+                        variant="outline"
+                      >
+                        Mark as Completed
+                      </Button>
+                    </>
+                  ) : (
+                    // Integrated MCQ test
+                    <Button 
+                      onClick={handleTakeTest}
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
-                      Take Screening Test <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </Button>
-                  <Button 
-                    onClick={handleScreeningComplete}
-                    variant="outline"
-                  >
-                    Mark as Completed
-                  </Button>
+                      <Play className="w-4 h-4 mr-2" />
+                      Start MCQ Test
+                    </Button>
+                  )}
                 </div>
-              </div>
-            ) : registration.screening_status === 'completed' ? (
-              <div className="text-green-700 bg-green-50 p-4 rounded-lg">
-                ✅ Screening test completed successfully!
+              </div>            ) : registration.screening_status === 'completed' ? (
+              <div className={`p-4 rounded-lg ${workflowData.test_result?.passed ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>
+                {workflowData.test_result ? (
+                  <div>
+                    <p className="font-semibold">
+                      {workflowData.test_result.passed ? '✅ Test Passed!' : '❌ Test Failed'}
+                    </p>
+                    <p className="mt-2">
+                      Score: {Math.round((workflowData.test_result.score / workflowData.test_result.total_questions) * 100)}% 
+                      ({workflowData.test_result.score}/{workflowData.test_result.total_questions} correct)
+                    </p>
+                    <p>Required: {workflowData.test_result.passing_score}%</p>
+                    <p className="text-sm mt-2">
+                      Completed: {new Date(workflowData.test_result.submitted_at).toLocaleString()}
+                    </p>
+                    {workflowData.test_result.passed && (
+                      <p className="mt-2 font-medium">🎉 You can now proceed to project submission!</p>
+                    )}
+                  </div>
+                ) : (
+                  <p>✅ Screening test completed successfully!</p>
+                )}
               </div>
             ) : registration.screening_status === 'skipped' ? (
               <div className="text-orange-700 bg-orange-50 p-4 rounded-lg">
@@ -289,23 +498,21 @@ export default function EventWorkflowPage() {
               </div>
             )}
           </CardContent>
-        </Card>
-
-        {/* Step 2: Presentation Submission */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              {getStatusIcon(registration.presentation_status)}
-              <div>
-                <CardTitle>Step 2: Project Submission</CardTitle>
-                <CardDescription>
-                  Status: {registration.presentation_status.charAt(0).toUpperCase() + registration.presentation_status.slice(1)}
-                </CardDescription>
+        </Card>        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped */}
+        {shouldShowStep2() && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                {getStatusIcon(registration.presentation_status)}
+                <div>
+                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardDescription>
+                    Status: {registration.presentation_status.charAt(0).toUpperCase() + registration.presentation_status.slice(1)}
+                  </CardDescription>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {(registration.screening_status === 'completed' || registration.screening_status === 'skipped') ? (
+            </CardHeader>
+            <CardContent>
               <form onSubmit={handlePresentationSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="github_link">GitHub Repository Link</Label>
@@ -347,8 +554,7 @@ export default function EventWorkflowPage() {
                     placeholder="Any additional information about your project..."
                     rows={4}
                   />
-                </div>
-                <Button 
+                </div>                <Button 
                   type="submit" 
                   disabled={submitting}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -356,14 +562,109 @@ export default function EventWorkflowPage() {
                   {submitting ? 'Submitting...' : registration.presentation_status === 'submitted' ? 'Update Submission' : 'Submit Project'}
                 </Button>
               </form>
-            ) : (
-              <div className="text-gray-600 bg-gray-50 p-4 rounded-lg">
-                Complete the screening test first to unlock project submission.
+            </CardContent>
+          </Card>
+        )}        {/* Step 2 Blocked Message - Show when user failed the test */}
+        {!shouldShowStep2() && registration.screening_status === 'completed' && workflowData.test_result && !workflowData.test_result.passed && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <div>
+                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardDescription>
+                    Access Restricted
+                  </CardDescription>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-red-700 bg-red-50 p-4 rounded-lg">
+                <p className="font-semibold">❌ Screening Test Required</p>
+                <p className="mt-2">
+                  You need to pass the screening test to access project submission. 
+                  Your current score is below the required passing percentage.
+                </p>
+                {workflowData.test_result && (
+                  <p className="mt-2 text-sm">
+                    Score: {Math.round((workflowData.test_result.score / workflowData.test_result.total_questions) * 100)}% 
+                    (Required: {workflowData.test_result.passing_score}%)
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2 Hidden Message - Show when no screening test is assigned */}
+        {!shouldShowStep2() && registration.screening_status === 'pending' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-gray-500" />
+                <div>
+                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardDescription>
+                    Waiting for Admin
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-gray-700 bg-gray-50 p-4 rounded-lg">
+                <p className="font-semibold">⏳ Project submission will be available after screening test assignment</p>
+                <p className="mt-2">
+                  The admin needs to assign and configure the screening test before project submission becomes available.
+                  Please check back later or contact the admin for more information.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>{/* Test Instructions Modal */}
+      {showInstructions && testData && (
+        <TestInstructionsModal
+          isOpen={showInstructions}
+          onClose={() => setShowInstructions(false)}
+          onStartTest={handleStartTest}
+          instructions={{
+            title: "Screening Test Instructions",
+            duration: testData.test.timer_minutes,
+            totalQuestions: testData.test.total_questions,
+            passingScore: testData.test.passing_score,
+            rules: [
+              "You must complete the test within the allocated time limit",
+              "Do not leave this browser tab or window during the test",
+              "Switching tabs more than 3 times will result in automatic submission",
+              "Each question must be answered before moving to the next",
+              "You can navigate between questions using the navigation buttons",
+              "Once submitted, you cannot retake the test",
+              "Ensure you have a stable internet connection",
+              "Do not refresh the page during the test"
+            ]
+          }}
+        />
+      )}
+
+      {/* MCQ Test Taker */}
+      {takingTest && testData && (
+        <MCQTestTaker
+          testId={testData.test.id}
+          questions={testData.test.questions}
+          timerMinutes={testData.test.timer_minutes}
+          eventId={eventId || ''}
+          onTestComplete={handleTestComplete}
+          onTestExit={handleTestExit}
+        />
+      )}
+
+      {/* Test Results */}
+      {showTestResults && testResult && (
+        <TestResults
+          result={testResult.result}
+          onContinue={handleResultsContinue}
+        />
+      )}
     </div>
   );
 }
