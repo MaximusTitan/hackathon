@@ -293,12 +293,10 @@ export default function EventWorkflowPage() {
       case 'pending':
         return 'Waiting for screening test assignment';
       case 'sent':
-        return 'Screening test available - please complete it';
-      case 'completed':
+        return 'Screening test available - please complete it';      case 'completed':
         if (test_result) {
-          const scorePercentage = test_result.total_questions > 0 
-            ? Math.round((test_result.score / test_result.total_questions) * 100)
-            : 0;
+          // test_result.score is already a percentage
+          const scorePercentage = Math.round(test_result.score);
           
           if (test_result.passed) {
             return `✅ Passed with ${scorePercentage}% (Required: ${test_result.passing_score}%)`;
@@ -471,10 +469,9 @@ export default function EventWorkflowPage() {
                   <div>
                     <p className="font-semibold">
                       {workflowData.test_result.passed ? '✅ Test Passed!' : '❌ Test Failed'}
-                    </p>
-                    <p className="mt-2">
-                      Score: {Math.round((workflowData.test_result.score / workflowData.test_result.total_questions) * 100)}% 
-                      ({workflowData.test_result.score}/{workflowData.test_result.total_questions} correct)
+                    </p>                    <p className="mt-2">
+                      Score: {Math.round(workflowData.test_result.score)}% 
+                      ({Math.round((workflowData.test_result.score * workflowData.test_result.total_questions) / 100)}/{workflowData.test_result.total_questions} correct)
                     </p>
                     <p>Required: {workflowData.test_result.passing_score}%</p>
                     <p className="text-sm mt-2">
@@ -536,7 +533,7 @@ export default function EventWorkflowPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="presentation_link">Presentation Link</Label>
+                  <Label htmlFor="presentation_link">Documentation/Presentation Link</Label>
                   <Input
                     id="presentation_link"
                     type="url"
@@ -585,9 +582,8 @@ export default function EventWorkflowPage() {
                   You need to pass the screening test to access project submission. 
                   Your current score is below the required passing percentage.
                 </p>
-                {workflowData.test_result && (
-                  <p className="mt-2 text-sm">
-                    Score: {Math.round((workflowData.test_result.score / workflowData.test_result.total_questions) * 100)}% 
+                {workflowData.test_result && (                  <p className="mt-2 text-sm">
+                    Score: {Math.round(workflowData.test_result.score)}% 
                     (Required: {workflowData.test_result.passing_score}%)
                   </p>
                 )}

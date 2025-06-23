@@ -43,7 +43,19 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ screeningTest: data });
+    // Parse questions if they exist and are stored as JSON string
+    let parsedScreeningTest = null;
+    if (data) {
+      parsedScreeningTest = {
+        ...data,
+        questions: data.questions ? 
+          (typeof data.questions === 'string' ? 
+            JSON.parse(data.questions) : 
+            data.questions) : []
+      };
+    }
+
+    return NextResponse.json({ screeningTest: parsedScreeningTest });
   } catch (error) {
     console.error("Error fetching screening test:", error);
     return NextResponse.json(

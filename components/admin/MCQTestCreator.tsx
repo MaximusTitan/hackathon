@@ -36,13 +36,17 @@ export default function MCQTestCreator({
   isSubmitting,
   mode 
 }: MCQTestCreatorProps) {
+  console.log('MCQTestCreator received existingTest:', existingTest);
+  
   const [testData, setTestData] = useState({
     title: existingTest?.title || 'Screening Test',
     instructions: existingTest?.instructions || "Please read each question carefully and select the best answer. You have limited time to complete this test.",
     timer_minutes: existingTest?.timer_minutes || 30,
     passing_score: existingTest?.passing_score || 70,
-    questions: existingTest?.questions || []
+    questions: Array.isArray(existingTest?.questions) ? existingTest.questions : []
   });
+
+  console.log('Initial testData:', testData);
 
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<MCQQuestion | null>(null);
@@ -222,9 +226,8 @@ export default function MCQTestCreator({
               Add Question
             </Button>
           )}
-        </CardHeader>
-        <CardContent>
-          {testData.questions.length === 0 ? (
+        </CardHeader>        <CardContent>
+          {(!testData.questions || !Array.isArray(testData.questions) || testData.questions.length === 0) ? (
             <div className="text-center py-8 text-gray-500">
               No questions added yet. Click "Add Question" to get started.
             </div>

@@ -32,12 +32,10 @@ export async function POST(request: Request) {
                      
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }
-
-    // Get the registration to validate it exists and get event info
+    }    // Get the registration to validate it exists and get event info
     const { data: registration, error: regError } = await supabase
       .from('registrations')
-      .select('id, event_id, user_name, attended, presentation_status')
+      .select('id, event_id, user_name, attended, presentation_status, qualification_status')
       .eq('id', registration_id)
       .single();
 
@@ -59,6 +57,14 @@ export async function POST(request: Request) {
     if (registration.presentation_status !== 'submitted') {
       return NextResponse.json(
         { error: "Participant must have submitted their project" }, 
+        { status: 400 }
+      );
+    }
+
+    // Check if the participant is qualified
+    if (registration.qualification_status !== 'qualified') {
+      return NextResponse.json(
+        { error: "Awards can only be assigned to qualified participants" }, 
         { status: 400 }
       );
     }
@@ -96,9 +102,7 @@ export async function POST(request: Request) {
         { error: updateError.message }, 
         { status: 500 }
       );
-    }
-
-    return NextResponse.json({ 
+    }    return NextResponse.json({ 
       success: true, 
       message: `${award_type === 'winner' ? 'Winner' : 'Runner-up'} assigned successfully`
     });
@@ -106,6 +110,62 @@ export async function POST(request: Request) {
     console.error("Error assigning award:", error);
     return NextResponse.json(
       { error: "Failed to assign award" }, 
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { registration_id } = await request.json();
+
+    if (!registration_id) {
+      return NextResponse.json(
+        { error: "Missing required parameter: registration_id" }, 
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+    
+    // Check if user is admin
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const isAdmin = session.user.user_metadata?.role === 'admin' || 
+                     session.user.user_metadata?.role === null;
+                     
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    // Remove the award from the registration
+    const { error: updateError } = await supabase
+      .from('registrations')
+      .update({
+        award_type: null,
+        award_assigned_at: null,
+        award_assigned_by: null
+      })
+      .eq('id', registration_id);
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: updateError.message }, 
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: `Award removed successfully`
+    });
+  } catch (error) {
+    console.error("Error removing award:", error);
+    return NextResponse.json(
+      { error: "Failed to remove award" }, 
       { status: 500 }
     );
   }

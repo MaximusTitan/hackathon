@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { 
@@ -38,7 +38,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft, Send, Clock, CheckCircle, FileText, Users, ExternalLink, Trophy, Medal } from "lucide-react";
+import { ArrowLeft, Send, Clock, CheckCircle, FileText, Users, ExternalLink, Trophy, Medal, Filter, Search, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import MCQTestCreator from "@/components/admin/MCQTestCreator";
 import { MCQQuestion } from "@/types/screening";
@@ -54,12 +54,17 @@ type EventRegistration = {
   screening_status?: 'pending' | 'sent' | 'completed' | 'skipped';
   screening_test_id?: string | null;
   presentation_status?: 'pending' | 'submitted' | 'reviewed';
+  qualification_status?: 'pending' | 'qualified' | 'rejected' | null;
+  qualification_remarks?: string | null;
+  qualified_at?: string | null;
+  qualified_by?: string | null;
   github_link?: string | null;
   deployment_link?: string | null;
   presentation_link?: string | null;
-  presentation_notes?: string | null;
-  award_type?: 'winner' | 'runner_up' | null;
+  presentation_notes?: string | null;  award_type?: 'winner' | 'runner_up' | null;
   award_assigned_at?: string | null;
+  admin_notes?: string | null;
+  admin_score?: number | null;
   user: {
     name: string;
     email: string;
@@ -140,38 +145,62 @@ export default function EventRegistrationsPage() {
     instructions: 'Please complete this screening test within the given deadline.',
     deadline: ''
   });  const [submittingScreening, setSubmittingScreening] = useState(false);
-  const [showAwardDialog, setShowAwardDialog] = useState(false);const [selectedForAward, setSelectedForAward] = useState<string>('');
-  const [awardType, setAwardType] = useState<'winner' | 'runner_up'>('winner');
-  const [assigningAward, setAssigningAward] = useState(false);  const [showNotesDialog, setShowNotesDialog] = useState(false);
-  const [selectedNotes, setSelectedNotes] = useState<string>('');
-  const [showMemberDetailDialog, setShowMemberDetailDialog] = useState(false);
+  const [showNotesDialog, setShowNotesDialog] = useState(false);
+  const [selectedNotes, setSelectedNotes] = useState<string>('');  const [showMemberDetailDialog, setShowMemberDetailDialog] = useState(false);
   const [selectedMember, setSelectedMember] = useState<EventRegistration | null>(null);
   const [updatingStartButton, setUpdatingStartButton] = useState(false);
+  
+  // Admin notes and scoring states
+  const [showNotesEditDialog, setShowNotesEditDialog] = useState(false);
+  const [showScoreEditDialog, setShowScoreEditDialog] = useState(false);
+  const [editingRegistrationId, setEditingRegistrationId] = useState<string>('');
+  const [editingNotes, setEditingNotes] = useState<string>('');
+  const [editingScore, setEditingScore] = useState<number>(0);
+  const [submittingNotes, setSubmittingNotes] = useState(false);
+  const [submittingScore, setSubmittingScore] = useState(false);
+  
+  // Sorting and filtering states
+  const [sortBy, setSortBy] = useState<string>('registered_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     async function fetchData() {
-      try {
-        // Fetch event details
+      try {        // Fetch event details
         const eventRes = await fetch(`/api/events/${eventId}`);
+        if (!eventRes.ok) {
+          console.error("Failed to fetch event:", eventRes.status, eventRes.statusText);
+          throw new Error(`Failed to fetch event: ${eventRes.status}`);
+        }
         const eventData = await eventRes.json();
         setEvent(eventData.event);
 
         // Fetch registrations for this event
         const res = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
-        const data = await res.json();
         
         if (res.ok) {
-          setRegistrations(data.registrations);
+          const data = await res.json();
+          console.log("Registrations data:", data); // Debug log
+          // Add default values for admin fields until database is updated
+          const registrationsWithDefaults = data.registrations.map((reg: any) => ({
+            ...reg,
+            admin_notes: reg.admin_notes || null,
+            admin_score: reg.admin_score || null
+          }));
+          setRegistrations(registrationsWithDefaults);
         } else {
-          console.error("Failed to fetch registrations:", data.error);
+          const data = await res.json();
+          console.error("Failed to fetch registrations:", res.status, data.error);
           toast.error("Failed to fetch registrations");
-        }
-
-        // Fetch existing screening test
+        }        // Fetch existing screening test
         const screeningRes = await fetch(`/api/admin/screening-test?event_id=${eventId}`);        if (screeningRes.ok) {
           const screeningData = await screeningRes.json();
+          console.log('Screening test data received:', screeningData);
           if (screeningData.screeningTest) {
+            console.log('Questions in screening test:', screeningData.screeningTest.questions);
             setScreeningTest(screeningData.screeningTest);
             setScreeningForm({
               mcq_link: screeningData.screeningTest.mcq_link || '',
@@ -180,10 +209,15 @@ export default function EventRegistrationsPage() {
                 new Date(screeningData.screeningTest.deadline).toISOString().slice(0, 16) : ''
             });
           }
-        }
-      } catch (error) {
+        } else {
+          console.error('Failed to fetch screening test:', await screeningRes.text());
+        }} catch (error) {
         console.error("Error fetching data:", error);
-        toast.error("Error loading data");
+        if (error instanceof Error) {
+          toast.error(`Error loading data: ${error.message}`);
+        } else {
+          toast.error("Error loading data");
+        }
       } finally {
         setLoading(false);
       }
@@ -296,83 +330,178 @@ export default function EventRegistrationsPage() {
     } catch (error) {
       console.error('Error skipping screening:', error);
       toast.error('Error skipping screening');
-    }
-  };
+    }  };
 
-  const handleAssignAward = async () => {
-    if (!selectedForAward) {
-      toast.error('Please select a participant to assign award');
-      return;
-    }
-
-    setAssigningAward(true);
-
-    try {
-      const res = await fetch('/api/admin/assign-award', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          registration_id: selectedForAward,
-          award_type: awardType
-        })
-      });
-
-      if (res.ok) {
-        toast.success(`${awardType === 'winner' ? 'Winner' : 'Runner-up'} assigned successfully`);
-        setShowAwardDialog(false);
-        setSelectedForAward('');
-        // Refresh registrations
-        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          setRegistrations(refreshData.registrations);
-        }
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Failed to assign award');
-      }
-    } catch (error) {
-      console.error('Error assigning award:', error);
-      toast.error('Error assigning award');
-    } finally {
-      setAssigningAward(false);
-    }
-  };
-  const handleRemoveAward = async (registrationId: string) => {
-    try {
-      const res = await fetch('/api/admin/remove-award', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          registration_id: registrationId
-        })
-      });
-
-      if (res.ok) {
-        toast.success('Award removed successfully');
-        // Refresh registrations
-        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
-        if (refreshRes.ok) {
-          const refreshData = await refreshRes.json();
-          setRegistrations(refreshData.registrations);
-        }
-      } else {
-        const error = await res.json();
-        toast.error(error.error || 'Failed to remove award');
-      }
-    } catch (error) {
-      console.error('Error removing award:', error);
-      toast.error('Error removing award');
-    }
-  };
   const handleShowNotes = (notes: string) => {
     setSelectedNotes(notes);
     setShowNotesDialog(true);
   };
-
   const handleShowMemberDetail = (member: EventRegistration) => {
     setSelectedMember(member);
     setShowMemberDetailDialog(true);
+  };
+
+  const handleEditNotes = (registrationId: string, currentNotes: string) => {
+    setEditingRegistrationId(registrationId);
+    setEditingNotes(currentNotes);
+    setShowNotesEditDialog(true);
+  };
+
+  const handleEditScore = (registrationId: string, currentScore: number) => {
+    setEditingRegistrationId(registrationId);
+    setEditingScore(currentScore);
+    setShowScoreEditDialog(true);
+  };
+
+  const handleUpdateNotes = async () => {
+    if (!editingRegistrationId) return;
+
+    setSubmittingNotes(true);
+
+    try {
+      const res = await fetch('/api/admin/update-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_id: editingRegistrationId,
+          admin_notes: editingNotes.trim() || null
+        })
+      });
+
+      if (res.ok) {
+        toast.success('Notes updated successfully');
+        setShowNotesEditDialog(false);
+        setEditingRegistrationId('');
+        setEditingNotes('');
+        // Refresh registrations
+        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setRegistrations(refreshData.registrations);
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update notes');
+      }
+    } catch (error) {
+      console.error('Error updating notes:', error);
+      toast.error('Error updating notes');
+    } finally {
+      setSubmittingNotes(false);
+    }
+  };
+
+  const handleUpdateScore = async () => {
+    if (!editingRegistrationId) return;
+
+    if (editingScore < 0 || editingScore > 100) {
+      toast.error('Score must be between 0 and 100');
+      return;
+    }
+
+    setSubmittingScore(true);
+
+    try {
+      const res = await fetch('/api/admin/update-score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_id: editingRegistrationId,
+          admin_score: editingScore
+        })
+      });
+
+      if (res.ok) {
+        toast.success('Score updated successfully');
+        setShowScoreEditDialog(false);
+        setEditingRegistrationId('');
+        setEditingScore(0);
+        // Refresh registrations
+        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setRegistrations(refreshData.registrations);
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update score');
+      }
+    } catch (error) {
+      console.error('Error updating score:', error);
+      toast.error('Error updating score');
+    } finally {
+      setSubmittingScore(false);
+    }  };
+
+  const handleQualificationChange = async (registrationId: string, newStatus: 'qualified' | 'rejected' | 'pending') => {
+    try {
+      const res = await fetch('/api/admin/qualification-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registration_id: registrationId,
+          qualification_status: newStatus,
+          qualification_remarks: null
+        })
+      });
+
+      if (res.ok) {
+        toast.success(`Participant marked as ${newStatus} successfully`);
+        // Refresh registrations
+        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setRegistrations(refreshData.registrations);
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update qualification status');
+      }
+    } catch (error) {
+      console.error('Error updating qualification status:', error);
+      toast.error('Error updating qualification status');
+    }
+  };
+
+  const handleAwardChange = async (registrationId: string, newAwardType: 'winner' | 'runner_up' | null) => {
+    try {
+      let res;
+      
+      if (newAwardType === null) {
+        // Remove award
+        res = await fetch('/api/admin/assign-award', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registration_id: registrationId })
+        });
+      } else {
+        // Assign award
+        res = await fetch('/api/admin/assign-award', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            registration_id: registrationId,
+            award_type: newAwardType
+          })
+        });
+      }
+
+      if (res.ok) {
+        toast.success(newAwardType ? `Award assigned successfully` : 'Award removed successfully');
+        // Refresh registrations
+        const refreshRes = await fetch(`/api/admin/event-registrations?event_id=${eventId}`);
+        if (refreshRes.ok) {
+          const refreshData = await refreshRes.json();
+          setRegistrations(refreshData.registrations);
+        }
+      } else {
+        const error = await res.json();
+        toast.error(error.error || 'Failed to update award');
+      }
+    } catch (error) {
+      console.error('Error updating award:', error);
+      toast.error('Error updating award');
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -381,6 +510,126 @@ export default function EventRegistrationsPage() {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Sorting and filtering functions
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+  const getSortIcon = (column: string) => {
+    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3" />;
+    return sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />;
+  };
+  // Filter and sort registrations
+  const filteredAndSortedRegistrations = useMemo(() => {
+    let filtered = registrations.filter(reg => {
+      // Search filter
+      const searchMatch = searchTerm === '' || 
+        reg.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        reg.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      let statusMatch = true;
+      switch (filterStatus) {
+        case 'attended':
+          statusMatch = reg.attended === true;
+          break;
+        case 'not_attended':
+          statusMatch = reg.attended === false;
+          break;
+        case 'paid':
+          statusMatch = reg.payment_id !== null;
+          break;
+        case 'unpaid':
+          statusMatch = reg.payment_id === null && reg.amount_paid !== 0;
+          break;
+        case 'free':
+          statusMatch = reg.amount_paid === 0;
+          break;
+        case 'screening_completed':
+          statusMatch = reg.screening_status === 'completed';
+          break;
+        case 'screening_pending':
+          statusMatch = reg.screening_status === 'pending' || !reg.screening_status;
+          break;        case 'presentation_submitted':
+          statusMatch = reg.presentation_status === 'submitted' || reg.presentation_status === 'reviewed';
+          break;
+        case 'qualified':
+          statusMatch = reg.qualification_status === 'qualified';
+          break;
+        case 'rejected':
+          statusMatch = reg.qualification_status === 'rejected';
+          break;
+        case 'qualification_pending':
+          statusMatch = (reg.presentation_status === 'submitted' || reg.presentation_status === 'reviewed') && 
+                       (!reg.qualification_status || reg.qualification_status === 'pending');
+          break;
+        case 'winners':
+          statusMatch = reg.award_type === 'winner';
+          break;        case 'runners_up':
+          statusMatch = reg.award_type === 'runner_up';
+          break;
+        case 'high_score':
+          statusMatch = reg.admin_score !== null && reg.admin_score !== undefined && reg.admin_score >= 80;
+          break;
+        case 'no_admin_score':
+          statusMatch = reg.admin_score === null || reg.admin_score === undefined;
+          break;
+        default:
+          statusMatch = true;
+      }
+
+      return searchMatch && statusMatch;
+    });
+
+    // Sort filtered results
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+
+      switch (sortBy) {
+        case 'name':
+          aValue = a.user.name.toLowerCase();
+          bValue = b.user.name.toLowerCase();
+          break;
+        case 'email':
+          aValue = a.user.email.toLowerCase();
+          bValue = b.user.email.toLowerCase();
+          break;
+        case 'registered_at':
+          aValue = new Date(a.registered_at);
+          bValue = new Date(b.registered_at);
+          break;
+        case 'amount_paid':
+          aValue = a.amount_paid || 0;
+          bValue = b.amount_paid || 0;
+          break;        case 'test_score':
+          aValue = a.test_attempt?.score_percentage || -1;
+          bValue = b.test_attempt?.score_percentage || -1;
+          break;
+        case 'admin_score':
+          aValue = a.admin_score ?? -1;
+          bValue = b.admin_score ?? -1;
+          break;
+        case 'attended':
+          aValue = a.attended ? 1 : 0;
+          bValue = b.attended ? 1 : 0;
+          break;
+        default:
+          aValue = a.registered_at;
+          bValue = b.registered_at;
+      }
+
+      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [registrations, searchTerm, filterStatus, sortBy, sortOrder]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
@@ -402,9 +651,7 @@ export default function EventRegistrationsPage() {
         {config.text}
       </span>
     );
-  };
-
-  const attendedRegistrations = registrations.filter(reg => reg.attended);
+  };  const attendedRegistrations = registrations.filter(reg => reg.attended);
   const canSelectForScreening = attendedRegistrations.filter(reg => 
     reg.screening_status === 'pending' || !reg.screening_status
   );
@@ -522,10 +769,9 @@ export default function EventRegistrationsPage() {
     } finally {
       setSubmittingScreening(false);
     }
-  };
-
-  return (
-    <div className="w-full max-w-7xl mx-auto p-6">
+  };  return (
+    <div className="w-full min-h-screen px-4 py-6">
+      <div className="w-full mx-auto">{/* Use full width instead of max-w-7xl */}
       <Button
         variant="ghost" 
         className="mb-6 text-rose-600 hover:text-rose-700"
@@ -566,22 +812,85 @@ export default function EventRegistrationsPage() {
               }
             </p>
           </div>
-        </div>
-      )}
+        </div>      )}
       
       {loading ? (
         <div className="text-center py-12">Loading registrations...</div>
       ) : (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <>          {/* Search and Filter Controls */}
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                {/* Search */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Filter Dropdown */}
+                <div className="flex gap-2">
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Participants</SelectItem>
+                      <SelectItem value="attended">Attended</SelectItem>
+                      <SelectItem value="not_attended">Not Attended</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="unpaid">Unpaid</SelectItem>
+                      <SelectItem value="free">Free Event</SelectItem>
+                      <SelectItem value="screening_completed">Screening Completed</SelectItem>                      <SelectItem value="screening_pending">Screening Pending</SelectItem>
+                      <SelectItem value="presentation_submitted">Presentation Submitted</SelectItem>
+                      <SelectItem value="qualified">Qualified</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>                      <SelectItem value="qualification_pending">Qualification Pending</SelectItem>
+                      <SelectItem value="winners">Winners</SelectItem>
+                      <SelectItem value="runners_up">Runners-up</SelectItem>
+                      <SelectItem value="high_score">High Admin Score (80+)</SelectItem>
+                      <SelectItem value="no_admin_score">No Admin Score</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                      setSortBy('registered_at');
+                      setSortOrder('desc');
+                    }}
+                    className="whitespace-nowrap"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
+              </div>
+
+              {/* Results Count */}
+              <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
+                Showing <span className="font-semibold">{filteredAndSortedRegistrations.length}</span> of <span className="font-semibold">{registrations.length}</span> participants
+                {(searchTerm || filterStatus !== 'all') && (
+                  <span className="text-blue-600 ml-2">(filtered)</span>
+                )}
+              </div>
+            </div>
+          </div>          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
                 <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{registrations.length}</div>
+              </CardHeader>              <CardContent>
+                <div className="text-2xl font-bold">{filteredAndSortedRegistrations.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {registrations.length !== filteredAndSortedRegistrations.length && `(${registrations.length} total)`}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -591,7 +900,7 @@ export default function EventRegistrationsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {registrations.filter(r => r.attended).length}
+                  {filteredAndSortedRegistrations.filter(r => r.attended).length}
                 </div>
               </CardContent>
             </Card>
@@ -602,18 +911,28 @@ export default function EventRegistrationsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {registrations.filter(r => r.screening_status === 'completed' || r.screening_status === 'skipped').length}
+                  {filteredAndSortedRegistrations.filter(r => r.screening_status === 'completed' || r.screening_status === 'skipped').length}
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Presentations Submitted</CardTitle>
+                <CardTitle className="text-sm font-medium">Projects Submitted</CardTitle>
                 <Send className="h-4 w-4 text-purple-600" />
+              </CardHeader>              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">
+                  {filteredAndSortedRegistrations.filter(r => r.presentation_status === 'submitted' || r.presentation_status === 'reviewed').length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Qualified</CardTitle>
+                <CheckCircle className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {registrations.filter(r => r.presentation_status === 'submitted' || r.presentation_status === 'reviewed').length}
+                <div className="text-2xl font-bold text-emerald-600">
+                  {filteredAndSortedRegistrations.filter(r => r.qualification_status === 'qualified').length}
                 </div>
               </CardContent>
             </Card>
@@ -624,7 +943,7 @@ export default function EventRegistrationsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-yellow-600">
-                  {winners.length}
+                  {filteredAndSortedRegistrations.filter(r => r.award_type === 'winner').length}
                 </div>
               </CardContent>
             </Card>
@@ -635,7 +954,7 @@ export default function EventRegistrationsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-silver-600">
-                  {runnersUp.length}
+                  {filteredAndSortedRegistrations.filter(r => r.award_type === 'runner_up').length}
                 </div>
               </CardContent>
             </Card>
@@ -644,27 +963,26 @@ export default function EventRegistrationsPage() {
           {/* Action Buttons */}
           {attendedRegistrations.length > 0 && (
             <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-3">Screening Test Management</h3>              <div className="flex flex-wrap gap-3">
-                <Button 
+              <h3 className="font-semibold text-blue-900 mb-3">Screening Test Management</h3>              <div className="flex flex-wrap gap-3">                <Button 
                   onClick={() => setShowMCQCreator(true)}
                   className="bg-green-600 hover:bg-green-700 text-white"
                   disabled={canSelectForScreening.length === 0}
                 >
                   <FileText className="mr-2 h-4 w-4" />
-                  {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 
+                  {screeningTest && ((screeningTest.questions?.length || 0) > 0 || (screeningTest.total_questions || 0) > 0)
                     ? 'Edit MCQ Test' 
                     : 'Create MCQ Test'
                   }
                 </Button>
 
-                {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 && (
+                {screeningTest && ((screeningTest.questions?.length || 0) > 0 || (screeningTest.total_questions || 0) > 0) && (
                   <Button 
                     onClick={() => setShowMCQSender(true)}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                     disabled={canSelectForScreening.length === 0 || selectedAttendees.length === 0}
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    Send MCQ Test ({screeningTest.questions.length} questions)
+                    Send MCQ Test ({screeningTest.total_questions || screeningTest.questions?.length || 0} questions)
                   </Button>
                 )}
                 
@@ -749,144 +1067,125 @@ export default function EventRegistrationsPage() {
                   Skip Screening for Selected
                 </Button>
               </div>              <p className="text-blue-700 text-sm mt-2">
-                {screeningTest && screeningTest.questions && screeningTest.questions.length > 0 
+                {screeningTest && ((screeningTest.questions?.length || 0) > 0 || (screeningTest.total_questions || 0) > 0)
                   ? 'First select participants, then click "Send MCQ Test" to distribute the saved test. You can also edit the existing test or create external test links.'
                   : 'Select attendees from the table below to create an integrated MCQ test or send external test links.'
                 }
-              </p>
-            </div>
+              </p>            </div>
           )}
 
-          {/* Awards Management Section */}
-          {attendedWithProjects.length > 0 && (
-            <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
-              <h3 className="font-semibold text-yellow-900 mb-3">Awards Management</h3>
-              <div className="flex flex-wrap gap-3">
-                <Dialog open={showAwardDialog} onOpenChange={setShowAwardDialog}>
-                  <DialogTrigger asChild>
-                    <Button 
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                    >
-                      <Trophy className="mr-2 h-4 w-4" />
-                      Assign Award
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                      <DialogTitle>Assign Award</DialogTitle>
-                      <DialogDescription>
-                        Select a participant and award type to assign
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="participant">Select Participant</Label>
-                        <Select
-                          value={selectedForAward}
-                          onValueChange={setSelectedForAward}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a participant" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {attendedWithProjects
-                              .filter(reg => !reg.award_type) // Only show unawarded participants
-                              .map(reg => (
-                                <SelectItem key={reg.id} value={reg.id}>
-                                  {reg.user.name} - {reg.user.email}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="award_type">Award Type</Label>
-                        <Select
-                          value={awardType}
-                          onValueChange={(value: 'winner' | 'runner_up') => setAwardType(value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="winner">
-                              <div className="flex items-center gap-2">
-                                <Trophy className="w-4 h-4 text-yellow-600" />
-                                Winner
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="runner_up">
-                              <div className="flex items-center gap-2">
-                                <Medal className="w-4 h-4 text-silver-600" />
-                                Runner-up
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setShowAwardDialog(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleAssignAward}
-                        disabled={assigningAward || !selectedForAward}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white"
-                      >
-                        {assigningAward ? 'Assigning...' : 'Assign Award'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <p className="text-yellow-700 text-sm mt-2">
-                Assign winners and runners-up for participants who have submitted their projects.
-              </p>
-            </div>
-          )}
-
-          {registrations.length === 0 ? (
+          {filteredAndSortedRegistrations.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center">
-              <p className="text-gray-500">No registrations found for this event.</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedAttendees.length === canSelectForScreening.length && canSelectForScreening.length > 0}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedAttendees(canSelectForScreening.map(r => r.id));
-                          } else {
-                            setSelectedAttendees([]);
-                          }
-                        }}
-                      />
-                    </TableHead>                    <TableHead>So. No.</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>LinkedIn</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Registered On</TableHead>
-                    <TableHead>Attended</TableHead>
-                    <TableHead>Screening Status</TableHead>
-                    <TableHead>Test Score</TableHead>
-                    <TableHead>Presentation Status</TableHead>
-                    <TableHead>Award Status</TableHead>
-                    <TableHead>Project Links</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {registrations.map((reg, idx) => (
+              {searchTerm || filterStatus !== 'all' ? (
+                <>
+                  <p className="text-gray-500 mb-4">No participants match your current filters.</p>
+                  <Button 
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFilterStatus('all');
+                    }}
+                    variant="outline"
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <p className="text-gray-500">No registrations found for this event.</p>
+              )}
+            </div>          ) : (
+            <>
+              {/* Info Section */}
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-blue-800 text-sm">
+                  <strong>Qualification & Awards:</strong> Use the dropdown menus in the table to manage project qualifications and assign awards. 
+                  Awards can only be assigned to qualified participants.
+                </p>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <Table className="w-full min-w-[1700px]">{/* Ensure minimum table width for all columns */}
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={selectedAttendees.length === canSelectForScreening.length && canSelectForScreening.length > 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedAttendees(canSelectForScreening.map(r => r.id));
+                            } else {
+                              setSelectedAttendees([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead className="w-16">So. No.</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[120px]"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Name {getSortIcon('name')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[200px]"
+                        onClick={() => handleSort('email')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Email {getSortIcon('email')}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[100px]">LinkedIn</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[100px]"
+                        onClick={() => handleSort('amount_paid')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Payment {getSortIcon('amount_paid')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[140px]"
+                        onClick={() => handleSort('registered_at')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Registered On {getSortIcon('registered_at')}
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[80px]"
+                        onClick={() => handleSort('attended')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Attended {getSortIcon('attended')}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[120px]">Screening Status</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[100px]"
+                        onClick={() => handleSort('test_score')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Test Score {getSortIcon('test_score')}
+                        </div>
+                      </TableHead>                      <TableHead className="min-w-[120px]">Project Status</TableHead>
+                      <TableHead className="min-w-[120px]">Qualification Status</TableHead>                      <TableHead className="min-w-[100px]">Award Status</TableHead>
+                      <TableHead className="min-w-[150px]">Admin Notes</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-gray-50 select-none min-w-[100px]"
+                        onClick={() => handleSort('admin_score')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Admin Score {getSortIcon('admin_score')}
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[120px]">Project Links</TableHead>
+                      <TableHead className="min-w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAndSortedRegistrations.map((reg, idx) => (
                     <TableRow key={reg.id}>
                       <TableCell>
                         <Checkbox
@@ -970,37 +1269,144 @@ export default function EventRegistrationsPage() {
                         ) : (
                           <span className="text-gray-400 text-sm">-</span>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>                      <TableCell>
                         {getStatusBadge(reg.presentation_status || 'pending')}
+                      </TableCell>                      <TableCell>
+                        <div className="min-w-[140px]">
+                          {(reg.presentation_status === 'submitted' || reg.presentation_status === 'reviewed') ? (
+                            <Select
+                              value={reg.qualification_status || 'pending'}
+                              onValueChange={(value: 'qualified' | 'rejected' | 'pending') => 
+                                handleQualificationChange(reg.id, value)
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3 h-3 text-yellow-600" />
+                                    <span className="text-yellow-600">Pending</span>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="qualified">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                    <span className="text-emerald-600">Qualified</span>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="rejected">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="w-3 h-3 text-red-600" />
+                                    <span className="text-red-600">Rejected</span>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-400 text-sm">No Project</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>                      <TableCell>
+                        <div className="min-w-[120px]">
+                          {reg.qualification_status === 'qualified' ? (
+                            <Select
+                              value={reg.award_type || 'none'}
+                              onValueChange={(value: 'winner' | 'runner_up' | 'none') => 
+                                handleAwardChange(reg.id, value === 'none' ? null : value)
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="text-gray-400">No Award</span>
+                                </SelectItem>
+                                <SelectItem value="winner">
+                                  <div className="flex items-center gap-2">
+                                    <Trophy className="w-3 h-3 text-yellow-600" />
+                                    <span className="text-yellow-600">Winner</span>
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="runner_up">
+                                  <div className="flex items-center gap-2">
+                                    <Medal className="w-3 h-3 text-gray-600" />
+                                    <span className="text-gray-600">Runner-up</span>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-gray-400 text-sm">
+                              {reg.qualification_status === 'rejected' ? 'Not Qualified' : 'Pending Qualification'}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        {reg.award_type ? (
-                          <div className="flex items-center gap-2">
-                            {reg.award_type === 'winner' ? (
-                              <>
-                                <Trophy className="w-4 h-4 text-yellow-600" />
-                                <span className="text-yellow-600 font-semibold">Winner</span>
-                              </>
-                            ) : (
-                              <>
-                                <Medal className="w-4 h-4 text-gray-600" />
-                                <span className="text-gray-600 font-semibold">Runner-up</span>
-                              </>
-                            )}
+                        <div className="min-w-[140px]">
+                          {reg.admin_notes ? (
+                            <div className="text-sm">
+                              <p className="text-gray-700 truncate" title={reg.admin_notes}>
+                                {reg.admin_notes.length > 30 ? `${reg.admin_notes.substring(0, 30)}...` : reg.admin_notes}
+                              </p>
+                              <Button
+                                onClick={() => handleEditNotes(reg.id, reg.admin_notes || '')}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs text-blue-600 hover:text-blue-700 p-0"
+                              >
+                                Edit
+                              </Button>
+                            </div>
+                          ) : (
                             <Button
-                              onClick={() => handleRemoveAward(reg.id)}
+                              onClick={() => handleEditNotes(reg.id, '')}
                               variant="ghost"
                               size="sm"
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                              title="Remove award"
+                              className="text-xs text-gray-500 hover:text-gray-700"
                             >
-                              ×
+                              Add Notes
                             </Button>
-                          </div>
-                        ) : (
-                          <span className="text-gray-400 text-sm">No award</span>
-                        )}
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-[80px]">
+                          {reg.admin_score !== null && reg.admin_score !== undefined ? (
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${
+                                reg.admin_score >= 70 ? 'text-green-600' : 
+                                reg.admin_score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                {reg.admin_score}/100
+                              </span>
+                              <Button
+                                onClick={() => handleEditScore(reg.id, reg.admin_score || 0)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-blue-600 hover:text-blue-700"
+                                title="Edit score"
+                              >
+                                ✏️
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => handleEditScore(reg.id, 0)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-gray-500 hover:text-gray-700"
+                            >
+                              Add Score
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {reg.github_link || reg.deployment_link || reg.presentation_link ? (
@@ -1065,10 +1471,11 @@ export default function EventRegistrationsPage() {
                           View Details
                         </Button>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>            </div>
+                    </TableRow>                  ))}                </TableBody>
+              </Table>
+              </div>
+            </div>
+            </>
           )}
         </>
       )}
@@ -1299,7 +1706,7 @@ export default function EventRegistrationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label className="text-sm font-medium text-gray-700">Presentation Status</Label>
+                    <Label className="text-sm font-medium text-gray-700">Project Status</Label>
                     <div className="flex items-center gap-2 mt-1">
                       {getStatusBadge(selectedMember.presentation_status || 'pending')}
                     </div>
@@ -1359,7 +1766,99 @@ export default function EventRegistrationsPage() {
                         {selectedMember.presentation_notes}
                       </div>
                     </div>
-                  )}
+                  )}                </CardContent>
+              </Card>
+
+              {/* Admin Assessment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Admin Assessment</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Admin Score</Label>
+                      {selectedMember.admin_score !== null && selectedMember.admin_score !== undefined ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`font-medium ${
+                            selectedMember.admin_score >= 70 ? 'text-green-600' : 
+                            selectedMember.admin_score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {selectedMember.admin_score}/100
+                          </span>
+                          <Button
+                            onClick={() => handleEditScore(selectedMember.id, selectedMember.admin_score || 0)}
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs"
+                          >
+                            Edit
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <Button
+                            onClick={() => handleEditScore(selectedMember.id, 0)}
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                          >
+                            Add Score
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">Overall Rating</Label>
+                      <div className="mt-1">
+                        {selectedMember.admin_score !== null && selectedMember.admin_score !== undefined ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            selectedMember.admin_score >= 80 ? 'bg-green-100 text-green-800' : 
+                            selectedMember.admin_score >= 60 ? 'bg-yellow-100 text-yellow-800' : 
+                            selectedMember.admin_score >= 40 ? 'bg-orange-100 text-orange-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedMember.admin_score >= 80 ? 'Excellent' : 
+                             selectedMember.admin_score >= 60 ? 'Good' : 
+                             selectedMember.admin_score >= 40 ? 'Average' : 'Needs Improvement'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500 text-sm">Not rated</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Admin Notes</Label>
+                    {selectedMember.admin_notes ? (
+                      <div className="mt-1">
+                        <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                          {selectedMember.admin_notes}
+                        </div>
+                        <Button
+                          onClick={() => handleEditNotes(selectedMember.id, selectedMember.admin_notes || '')}
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 text-xs"
+                        >
+                          Edit Notes
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        <p className="text-sm text-gray-500 mb-2">No admin notes available</p>
+                        <Button
+                          onClick={() => handleEditNotes(selectedMember.id, '')}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                        >
+                          Add Notes
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1454,7 +1953,102 @@ export default function EventRegistrationsPage() {
               Close
             </Button>
           </DialogFooter>
-        </DialogContent>      </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Notes Edit Dialog */}
+      <Dialog open={showNotesEditDialog} onOpenChange={setShowNotesEditDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Admin Notes</DialogTitle>
+            <DialogDescription>
+              Add or update admin notes for this participant
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="admin_notes">Admin Notes</Label>
+              <Textarea
+                id="admin_notes"
+                value={editingNotes}
+                onChange={(e) => setEditingNotes(e.target.value)}
+                placeholder="Add notes about this participant's performance, behavior, or any other relevant information..."
+                rows={6}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowNotesEditDialog(false);
+                setEditingRegistrationId('');
+                setEditingNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateNotes}
+              disabled={submittingNotes}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {submittingNotes ? 'Saving...' : 'Save Notes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin Score Edit Dialog */}
+      <Dialog open={showScoreEditDialog} onOpenChange={setShowScoreEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Admin Score</DialogTitle>
+            <DialogDescription>
+              Set a score for this participant (0-100)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="admin_score">Score (0-100)</Label>
+              <Input
+                id="admin_score"
+                type="number"
+                min="0"
+                max="100"
+                value={editingScore}
+                onChange={(e) => setEditingScore(Number(e.target.value))}
+                className="mt-1"
+              />
+              <p className="text-sm text-gray-600 mt-1">
+                This score is separate from the screening test score and can be used for overall evaluation.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowScoreEditDialog(false);
+                setEditingRegistrationId('');
+                setEditingScore(0);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateScore}
+              disabled={submittingScore}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {submittingScore ? 'Saving...' : 'Save Score'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* MCQ Test Creator Dialog */}
       <Dialog open={showMCQCreator} onOpenChange={setShowMCQCreator}>
@@ -1472,12 +2066,12 @@ export default function EventRegistrationsPage() {
               instructions: screeningTest.instructions,
               timer_minutes: screeningTest.timer_minutes || 30,
               passing_score: screeningTest.passing_score || 70,
-              questions: screeningTest.questions || []
+              questions: Array.isArray(screeningTest.questions) ? screeningTest.questions : []
             } : null}
             onSave={handleSaveMCQTest}
             isSubmitting={submittingScreening}
             mode={screeningTest ? 'edit' : 'create'}
-          />        </DialogContent>
+          /></DialogContent>
       </Dialog>
 
       {/* MCQ Test Sender Dialog */}
@@ -1497,9 +2091,8 @@ export default function EventRegistrationsPage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="font-medium">Title:</span> {screeningTest.title || 'Screening Test'}
-                  </div>
-                  <div>
-                    <span className="font-medium">Questions:</span> {screeningTest.questions?.length || 0}
+                  </div>                  <div>
+                    <span className="font-medium">Questions:</span> {screeningTest.total_questions || screeningTest.questions?.length || 0}
                   </div>
                   <div>
                     <span className="font-medium">Time Limit:</span> {screeningTest.timer_minutes || 30} minutes
@@ -1542,8 +2135,8 @@ export default function EventRegistrationsPage() {
               {submittingScreening ? 'Sending...' : 'Send MCQ Test'}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </DialogContent>      </Dialog>
+      </div>
     </div>
   );
 }

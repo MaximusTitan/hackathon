@@ -46,11 +46,16 @@ export async function GET(request: Request) {
         presentation_status,
         github_link,
         deployment_link,
-        presentation_link,
-        presentation_notes,
+        presentation_link,        presentation_notes,
         award_type,
         award_assigned_at,
-        award_assigned_by
+        award_assigned_by,
+        admin_notes,
+        admin_score,
+        qualification_status,
+        qualification_remarks,
+        qualified_at,
+        qualified_by
       `)
       .eq('event_id', event_id);    if (error) {
       return NextResponse.json(
@@ -148,10 +153,15 @@ export async function GET(request: Request) {
         presentation_status: reg.presentation_status,
         github_link: reg.github_link,
         deployment_link: reg.deployment_link,
-        presentation_link: reg.presentation_link,
-        presentation_notes: reg.presentation_notes,
+        presentation_link: reg.presentation_link,        presentation_notes: reg.presentation_notes,
         award_type: reg.award_type,
         award_assigned_at: reg.award_assigned_at,
+        admin_notes: reg.admin_notes,
+        admin_score: reg.admin_score,
+        qualification_status: reg.qualification_status,
+        qualification_remarks: reg.qualification_remarks,
+        qualified_at: reg.qualified_at,
+        qualified_by: reg.qualified_by,
         user: {
           name: reg.user_name || 'Unknown',
           email: reg.user_email || 'Unknown',
