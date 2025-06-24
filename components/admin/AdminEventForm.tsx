@@ -55,6 +55,7 @@ type Event = {
   created_at: string;
   time_tba?: boolean;
   venue_tba?: boolean;
+  project_instructions?: string | null;
 };
 
 interface AdminEventFormProps {
@@ -81,6 +82,7 @@ interface AdminEventFormProps {
     date_tba: boolean;
     time_tba: boolean;
     venue_tba: boolean;
+    project_instructions: string;
   };
   setForm: (form: any) => void;
   startDateObj: Date | undefined;
@@ -551,6 +553,36 @@ export function AdminEventForm({
                   redo: true
                 }}
               />
+            </div>
+
+            {/* Project Instructions */}
+            <div className="grid gap-2">
+              <Label htmlFor="project_instructions" className="text-gray-700">
+                Project Instructions
+              </Label>
+              <TiptapEditor
+                content={form.project_instructions || ""}
+                onChange={(content) => setForm((f: any) => ({ ...f, project_instructions: content }))}
+                placeholder="Enter project instructions for participants who pass the screening test..."
+                toolbar={{
+                  bold: true,
+                  italic: true,
+                  underline: true,
+                  bulletList: true,
+                  orderedList: true,
+                  heading: {
+                    h1: true,
+                    h2: true,
+                    h3: true
+                  },
+                  link: true,
+                  undo: true,
+                  redo: true
+                }}
+              />
+              <p className="text-gray-500 text-xs">
+                These instructions will be shown to participants after they pass the screening test or if screening is skipped.
+              </p>
             </div>
 
             {/* Image Upload */}

@@ -24,6 +24,7 @@ type WorkflowData = {
   event: {
     id: string;
     title: string;
+    project_instructions?: string | null;
   };
   registration: {
     id: string;
@@ -495,7 +496,34 @@ export default function EventWorkflowPage() {
               </div>
             )}
           </CardContent>
-        </Card>        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped */}
+        </Card>
+
+        {/* Project Instructions - Show after passing screening or if screening is skipped */}
+        {shouldShowStep2() && event.project_instructions && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <div>
+                  <CardTitle>Project Instructions</CardTitle>
+                  <CardDescription>
+                    Guidelines for your project submission
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div 
+                  className="prose prose-blue max-w-none text-blue-900"
+                  dangerouslySetInnerHTML={{ __html: event.project_instructions }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped */}
         {shouldShowStep2() && (
           <Card>
             <CardHeader>

@@ -35,6 +35,7 @@ type Event = {
   date_tba?: boolean;
   time_tba?: boolean;
   venue_tba?: boolean;
+  project_instructions?: string | null;
 };
 
 export default function AdminDashboard() {
@@ -63,6 +64,7 @@ export default function AdminDashboard() {
     date_tba: false,
     time_tba: false,
     venue_tba: false,
+    project_instructions: "",
   });
   const [creating, setCreating] = useState(false);
   const [startDateObj, setStartDateObj] = useState<Date | undefined>(undefined);
@@ -129,7 +131,7 @@ export default function AdminDashboard() {
         }
 
         // Initialize participant data with loading states
-        const initialData: Record<string, { count: number; loading: boolean }> = {};
+        const initialData: Record<string, { count: number, loading: boolean }> = {};
         filteredEvents.forEach((event: Event) => {
           initialData[event.id] = {
             count: 0,
@@ -449,7 +451,8 @@ export default function AdminDashboard() {
   const startEditing = (event: Event) => {
     // Scroll to top of the page
     window.scrollTo({ top: 0, behavior: 'smooth' });
-      setForm({
+    
+    setForm({
       title: event.title,
       description: event.description || "",
       start_date: event.start_date || "",
@@ -472,6 +475,7 @@ export default function AdminDashboard() {
       date_tba: event.date_tba || false,
       time_tba: event.time_tba || false,
       venue_tba: event.venue_tba || false,
+      project_instructions: event.project_instructions || "",
     });
     setStartDateObj(event.start_date ? new Date(event.start_date) : undefined);
     setEndDateObj(event.end_date ? new Date(event.end_date) : undefined);
@@ -504,6 +508,7 @@ export default function AdminDashboard() {
       date_tba: false,
       time_tba: false,
       venue_tba: false,
+      project_instructions: "",
     });
     setStartDateObj(undefined);
     setEndDateObj(undefined);
