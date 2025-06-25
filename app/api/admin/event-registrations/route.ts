@@ -5,6 +5,16 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const event_id = searchParams.get('event_id');
+    
+    // Server-side pagination parameters
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
+    const filter = searchParams.get('filter') || 'all';
+    const sort = searchParams.get('sort') || 'registered_at';
+    const order = searchParams.get('order') || 'desc';
+    
+    const offset = (page - 1) * limit;
 
     if (!event_id) {
       return NextResponse.json(
@@ -26,8 +36,10 @@ export async function GET(request: Request) {
                      
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-    }    // Get registrations with comprehensive member information
-    const { data, error } = await supabase
+    }
+
+    // Build query with filters and search
+    let query = supabase
       .from('registrations')
       .select(`
         id,
@@ -46,7 +58,8 @@ export async function GET(request: Request) {
         presentation_status,
         github_link,
         deployment_link,
-        presentation_link,        presentation_notes,
+        presentation_link,
+        presentation_notes,
         award_type,
         award_assigned_at,
         award_assigned_by,
@@ -56,60 +69,155 @@ export async function GET(request: Request) {
         qualification_remarks,
         qualified_at,
         qualified_by
-      `)
-      .eq('event_id', event_id);    if (error) {
+      `, { count: 'exact' })
+      .eq('event_id', event_id);
+
+    // Apply search filter
+    if (search) {
+      query = query.or(`user_name.ilike.%${search}%,user_email.ilike.%${search}%`);
+    }
+
+    // Apply status filters
+    switch (filter) {
+      case 'attended':
+        query = query.eq('attended', true);
+        break;
+      case 'not_attended':
+        query = query.eq('attended', false);
+        break;
+      case 'screening_completed':
+        query = query.eq('screening_status', 'completed');
+        break;
+      case 'screening_pending':
+        query = query.in('screening_status', ['pending', null]);
+        break;
+      case 'presentation_submitted':
+        query = query.in('presentation_status', ['submitted', 'reviewed']);
+        break;
+      case 'qualified':
+        query = query.eq('qualification_status', 'qualified');
+        break;
+      case 'rejected':
+        query = query.eq('qualification_status', 'rejected');
+        break;
+      case 'qualification_pending':
+        query = query.in('presentation_status', ['submitted', 'reviewed']).in('qualification_status', ['pending', null]);
+        break;
+      case 'winners':
+        query = query.eq('award_type', 'winner');
+        break;
+      case 'runners_up':
+        query = query.eq('award_type', 'runner_up');
+        break;
+      case 'high_score':
+        query = query.gte('admin_score', 80);
+        break;
+      case 'no_admin_score':
+        query = query.is('admin_score', null);
+        break;
+      // 'all' and default case - no additional filter
+    }
+
+    // Apply sorting
+    const ascending = order === 'asc';
+    switch (sort) {
+      case 'name':
+        query = query.order('user_name', { ascending });
+        break;
+      case 'email':
+        query = query.order('user_email', { ascending });
+        break;
+      case 'registered_at':
+        query = query.order('registered_at', { ascending });
+        break;
+      case 'attended':
+        query = query.order('attended', { ascending });
+        break;
+      case 'admin_score':
+        query = query.order('admin_score', { ascending, nullsFirst: !ascending });
+        break;
+      default:
+        query = query.order('registered_at', { ascending: false });
+        break;
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
       return NextResponse.json(
         { error: error.message }, 
         { status: 500 }
       );
     }
 
-    // Get detailed test attempts for all registrations
-    const registrationIds = data.map(reg => reg.id);
-    const { data: testAttempts, error: attemptsError } = await supabase
-      .from('user_test_attempts')
-      .select(`
-        id,
-        user_id,
-        registration_id,
-        screening_test_id,
-        started_at,
-        submitted_at,
-        score,
-        total_questions,
-        time_taken_seconds,
-        status,
-        tab_switches
-      `)
-      .in('registration_id', registrationIds);    // Get screening test details
-    const screeningTestIds = Array.from(new Set(data.map(reg => reg.screening_test_id).filter(Boolean)));
-    const { data: screeningTests, error: testsError } = await supabase
-      .from('screening_tests')
-      .select(`
-        id,
-        title,
-        passing_score,
-        timer_minutes,
-        total_questions,
-        mcq_link,
-        deadline
-      `)
-      .in('id', screeningTestIds);
+    // Get detailed test attempts for current page registrations only
+    const registrationIds = data?.map(reg => reg.id) || [];
+    let testAttempts: any[] = [];
+    let screeningTests: any[] = [];
+    let adminProfiles: any[] = [];
 
-    // Get admin profiles for award assignees
-    const awardAssignedByIds = Array.from(new Set(data.map(reg => reg.award_assigned_by).filter(Boolean)));
-    const { data: adminProfiles, error: adminError } = await supabase
-      .from('admin_profiles')
-      .select(`
-        id,
-        name,
-        email
-      `)
-      .in('id', awardAssignedByIds);
+    if (registrationIds.length > 0) {
+      // Fetch test attempts only for current page
+      const { data: testAttemptsData } = await supabase
+        .from('user_test_attempts')
+        .select(`
+          id,
+          user_id,
+          registration_id,
+          screening_test_id,
+          started_at,
+          submitted_at,
+          score,
+          total_questions,
+          time_taken_seconds,
+          status,
+          tab_switches
+        `)
+        .in('registration_id', registrationIds);
+
+      testAttempts = testAttemptsData || [];
+
+      // Get screening test details
+      const screeningTestIds = Array.from(new Set(data.map(reg => reg.screening_test_id).filter(Boolean)));
+      if (screeningTestIds.length > 0) {
+        const { data: screeningTestsData } = await supabase
+          .from('screening_tests')
+          .select(`
+            id,
+            title,
+            passing_score,
+            timer_minutes,
+            total_questions,
+            mcq_link,
+            deadline
+          `)
+          .in('id', screeningTestIds);
+
+        screeningTests = screeningTestsData || [];
+      }
+
+      // Get admin profiles for award assignees
+      const awardAssignedByIds = Array.from(new Set(data.map(reg => reg.award_assigned_by).filter(Boolean)));
+      if (awardAssignedByIds.length > 0) {
+        const { data: adminProfilesData } = await supabase
+          .from('admin_profiles')
+          .select(`
+            id,
+            name,
+            email
+          `)
+          .in('id', awardAssignedByIds);
+
+        adminProfiles = adminProfilesData || [];
+      }
+    }
 
     // Create lookup maps
     const testAttemptsMap = new Map();
-    testAttempts?.forEach(attempt => {
+    testAttempts.forEach(attempt => {
       if (!testAttemptsMap.has(attempt.registration_id)) {
         testAttemptsMap.set(attempt.registration_id, []);
       }
@@ -117,15 +225,15 @@ export async function GET(request: Request) {
     });
 
     const screeningTestsMap = new Map();
-    screeningTests?.forEach(test => {
+    screeningTests.forEach(test => {
       screeningTestsMap.set(test.id, test);
     });
 
     const adminProfilesMap = new Map();
-    adminProfiles?.forEach(admin => {
+    adminProfiles.forEach(admin => {
       adminProfilesMap.set(admin.id, admin);
     });    // Format the data for the frontend with comprehensive member information
-    const registrations = data.map(reg => {
+    const registrations = (data || []).map(reg => {
       const userAttempts = testAttemptsMap.get(reg.id) || [];
       const screeningTest = reg.screening_test_id ? screeningTestsMap.get(reg.screening_test_id) : null;
       const awardAssignedByAdmin = reg.award_assigned_by ? adminProfilesMap.get(reg.award_assigned_by) : null;      // Get the latest/best test attempt
@@ -208,7 +316,12 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ registrations });
+    return NextResponse.json({ 
+      registrations, 
+      totalCount: count || 0,
+      currentPage: page,
+      itemsPerPage: limit 
+    });
   } catch (error) {
     console.error("Error fetching event registrations:", error);
     return NextResponse.json(

@@ -13,6 +13,9 @@ const PastEventGallery = lazy(() => import("@/components/PastEventGallery"));
 const EventRecruitingPartners = lazy(() => import("@/components/EventRecruitingPartners"));
 const InlineRecruitingPartnersAdmin = lazy(() => import("@/components/InlineRecruitingPartnersAdmin"));
 
+// Import pagination component
+import { Pagination } from "@/components/admin/event-registrations/Pagination";
+
 type Participant = {
   id: string;
   user_id: string;
@@ -70,8 +73,32 @@ export default function EventDetailsPage() {
   const [participantsLoading, setParticipantsLoading] = useState(true);
   const [winners, setWinners] = useState<Participant[]>([]);
   const [runnersUp, setRunnersUp] = useState<Participant[]>([]);  const [winnersLoading, setWinnersLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);  const [recruitingPartnersKey, setRecruitingPartnersKey] = useState(0);
-  const router = useRouter();const supabase = createClientComponentClient();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [recruitingPartnersKey, setRecruitingPartnersKey] = useState(0);
+  
+  // Pagination state for participants
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  const router = useRouter();
+  const supabase = createClientComponentClient();
+
+  // Pagination calculations for participants
+  const totalParticipants = participants.length;
+  const totalPages = Math.ceil(totalParticipants / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedParticipants = participants.slice(startIndex, endIndex);
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
 
   // Function to determine if param is an ID (UUID) or title slug
   const isUUID = (str: string) => {
@@ -843,65 +870,87 @@ export default function EventDetailsPage() {
             ) : participants.length === 0 ? (
               <div className="text-gray-500">No participants registered yet.</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-200 rounded-lg">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Photo</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Name</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">Email</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border-b">LinkedIn</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participants.map((p) => (
-                      <tr key={p.id} className="border-b last:border-b-0">
-                        <td className="px-4 py-2">
-                          {p.photo_url ? (
-                            <Link
-                              href={`/profile/${p.user_id}`}
-                              className="cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                              <Image
-                                src={p.photo_url}
-                                alt={p.user_name || "Profile"}
-                                width={40}
-                                height={40}
-                                className="w-10 h-10 rounded-full object-cover border hover:border-rose-300"
-                                loading="lazy"
-                              />
-                            </Link>
-                          ) : (
-                            <Link
-                              href={`/profile/${p.user_id}`}
-                              className="cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold hover:bg-gray-200">
-                                {p.user_name?.charAt(0).toUpperCase() || "U"}
-                              </span>
-                            </Link>
-                          )}
-                        </td>
-                        <td className="px-4 py-2 text-gray-900">{p.user_name || "Unknown"}</td>
-                        <td className="px-4 py-2 text-gray-700">{p.user_email}</td>
-                        <td className="px-4 py-2">
-                          {p.user_linkedin ? (
-                            <a
-                              href={p.user_linkedin}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline text-sm"
-                            >
-                              LinkedIn
-                            </a>
-                          ) : (
-                            <span className="text-gray-400 text-sm">—</span>
-                          )}
-                        </td>
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Photo</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">LinkedIn</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {paginatedParticipants.map((p, index) => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {startIndex + index + 1}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {p.photo_url ? (
+                              <Link
+                                href={`/profile/${p.user_id}`}
+                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                              >
+                                <Image
+                                  src={p.photo_url}
+                                  alt={p.user_name || "Profile"}
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 rounded-full object-cover border hover:border-rose-300"
+                                  loading="lazy"
+                                />
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/profile/${p.user_id}`}
+                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                              >
+                                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 text-gray-400 font-bold hover:bg-gray-200">
+                                  {p.user_name?.charAt(0).toUpperCase() || "U"}
+                                </span>
+                              </Link>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {p.user_name || "Unknown"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                            {p.user_email}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                            {p.user_linkedin ? (
+                              <a
+                                href={p.user_linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                LinkedIn
+                              </a>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Pagination Controls */}
+                {totalParticipants > 0 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={totalParticipants}
+                    onPageChange={handlePageChange}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                  />
+                )}
               </div>
             )}
           </div>

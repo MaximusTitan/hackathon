@@ -513,9 +513,9 @@ export default function EventWorkflowPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <div 
-                  className="prose prose-blue max-w-none text-blue-900"
+                  className="prose max-w-none text-gray-900"
                   dangerouslySetInnerHTML={{ __html: event.project_instructions }}
                 />
               </div>
