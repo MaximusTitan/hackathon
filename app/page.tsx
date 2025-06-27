@@ -98,6 +98,7 @@ export default function Home() {
         try {
           data = await res.json();
         } catch (err) {
+          console.error('Error parsing API response:', err);
           data = {};
         }        // Filter and sort events
         const currentDate = new Date();
@@ -109,7 +110,20 @@ export default function Home() {
               return !showPastEvents; // Show in upcoming, not in past
             }
             
-            const eventDate = new Date(event.start_date || "");
+            // If no start_date, treat as upcoming event (could be draft)
+            if (!event.start_date) {
+              return !showPastEvents;
+            }
+            
+            // Parse the event date safely
+            const eventDate = new Date(event.start_date);
+            
+            // Check if the date is valid
+            if (isNaN(eventDate.getTime())) {
+              console.warn(`Invalid date for event ${event.id}: ${event.start_date}`);
+              return !showPastEvents; // Treat invalid dates as upcoming
+            }
+            
             eventDate.setHours(0, 0, 0, 0); // Set to start of event date for proper date-only comparison
             if (showPastEvents) {
               return eventDate < currentDate;
@@ -121,7 +135,9 @@ export default function Home() {
             const dateA = new Date(a.created_at || "");
             const dateB = new Date(b.created_at || "");
             return dateB.getTime() - dateA.getTime();
-          });        // Show events immediately
+          });
+        
+        // Show events immediately
         setEvents(filteredEvents);
         setLoading(false);
 

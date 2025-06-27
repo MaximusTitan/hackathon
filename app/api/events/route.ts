@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (user) {
-      isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
+      // Only treat as admin if explicitly set as admin role
+      isAdmin = user.user_metadata?.role === 'admin';
     }
   } catch (error) {
     console.error("Error authenticating user:", error);
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   const { data: events, error } = await query;
 
   if (error) {
+    console.error('Database error:', error);
     return NextResponse.json({ events: [] }, { status: 500 });
   }
 
