@@ -540,7 +540,7 @@ export default function EventWorkflowPage() {
             <CardContent>
               <form onSubmit={handlePresentationSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="github_link">GitHub Repository Link</Label>
+                  <Label htmlFor="github_link">GitHub Repository Link *</Label>
                   <Input
                     id="github_link"
                     type="url"
@@ -551,23 +551,25 @@ export default function EventWorkflowPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="deployment_link">Deployed Application Link</Label>
+                  <Label htmlFor="deployment_link">Deployed Application Link *</Label>
                   <Input
                     id="deployment_link"
                     type="url"
                     value={presentationForm.deployment_link}
                     onChange={(e) => setPresentationForm(prev => ({ ...prev, deployment_link: e.target.value }))}
                     placeholder="https://your-app.vercel.app"
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="presentation_link">Documentation/Presentation Link</Label>
+                  <Label htmlFor="presentation_link">Documentation/Presentation Link *</Label>
                   <Input
                     id="presentation_link"
                     type="url"
                     value={presentationForm.presentation_link}
                     onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_link: e.target.value }))}
                     placeholder="https://docs.google.com/presentation/... or https://canva.com/..."
+                    required
                   />
                 </div>
                 <div>
