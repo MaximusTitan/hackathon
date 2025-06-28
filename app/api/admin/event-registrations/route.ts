@@ -91,6 +91,12 @@ export async function GET(request: Request) {
       case 'screening_pending':
         query = query.in('screening_status', ['pending', null]);
         break;
+      case 'screening_passed':
+        // Will be handled after fetching test attempts
+        break;
+      case 'screening_failed':
+        // Will be handled after fetching test attempts
+        break;
       case 'presentation_submitted':
         query = query.in('presentation_status', ['submitted', 'reviewed']);
         break;
@@ -120,6 +126,8 @@ export async function GET(request: Request) {
 
     // Apply sorting
     const ascending = order === 'asc';
+    const needsTestScoreSorting = sort === 'test_score';
+    
     switch (sort) {
       case 'name':
         query = query.order('user_name', { ascending });
@@ -136,13 +144,21 @@ export async function GET(request: Request) {
       case 'admin_score':
         query = query.order('admin_score', { ascending, nullsFirst: !ascending });
         break;
+      case 'test_score':
+        // Test score sorting will be handled after data processing
+        // For now, just order by registered_at to have consistent ordering
+        query = query.order('registered_at', { ascending: false });
+        break;
       default:
         query = query.order('registered_at', { ascending: false });
         break;
     }
 
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1);
+    // Apply pagination (except for screening passed/failed filters and test_score sorting which need post-processing)
+    const needsPostProcessingFilter = filter === 'screening_passed' || filter === 'screening_failed' || needsTestScoreSorting;
+    if (!needsPostProcessingFilter) {
+      query = query.range(offset, offset + limit - 1);
+    }
 
     const { data, error, count } = await query;
 
@@ -316,9 +332,51 @@ export async function GET(request: Request) {
       };
     });
 
+    // Apply post-processing filters for screening passed/failed
+    let filteredRegistrations = registrations;
+    let finalCount = count || 0;
+
+    if (filter === 'screening_passed') {
+      filteredRegistrations = registrations.filter(reg => 
+        reg.test_attempt && reg.test_attempt.passed === true
+      );
+      finalCount = filteredRegistrations.length;
+    } else if (filter === 'screening_failed') {
+      filteredRegistrations = registrations.filter(reg => 
+        reg.test_attempt && reg.test_attempt.passed === false
+      );
+      finalCount = filteredRegistrations.length;
+    }
+
+    // Apply test score sorting if requested
+    if (needsTestScoreSorting) {
+      filteredRegistrations.sort((a, b) => {
+        const scoreA = a.test_attempt?.score_percentage || -1; // Use -1 for no score to sort them last
+        const scoreB = b.test_attempt?.score_percentage || -1;
+        
+        if (ascending) {
+          return scoreA - scoreB;
+        } else {
+          return scoreB - scoreA;
+        }
+      });
+      
+      // Update finalCount if we're also filtering
+      if (filter === 'all') {
+        finalCount = filteredRegistrations.length;
+      }
+    }
+
+    // Apply pagination for post-processed filters
+    if (needsPostProcessingFilter) {
+      const startIndex = offset;
+      const endIndex = offset + limit;
+      filteredRegistrations = filteredRegistrations.slice(startIndex, endIndex);
+    }
+
     return NextResponse.json({ 
-      registrations, 
-      totalCount: count || 0,
+      registrations: filteredRegistrations, 
+      totalCount: finalCount,
       currentPage: page,
       itemsPerPage: limit 
     });

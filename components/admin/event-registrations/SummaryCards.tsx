@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Users, FileText, Send, Trophy, Medal } from "lucide-react";
+import { CheckCircle, Users, FileText, Send, Trophy, Medal, ThumbsUp, ThumbsDown } from "lucide-react";
 
 interface EventRegistration {
   id: string;
@@ -10,6 +10,10 @@ interface EventRegistration {
   presentation_status?: 'pending' | 'submitted' | 'reviewed';
   qualification_status?: 'pending' | 'qualified' | 'rejected' | null;
   award_type?: 'winner' | 'runner_up' | null;
+  test_attempt?: {
+    passed?: boolean;
+    score_percentage?: number;
+  } | null;
 }
 
 interface SummaryCardsProps {
@@ -21,6 +25,12 @@ export function SummaryCards({ registrations }: SummaryCardsProps) {
   const screeningCompletedCount = registrations.filter(r => 
     r.screening_status === 'completed' || r.screening_status === 'skipped'
   ).length;
+  const screeningPassedCount = registrations.filter(r => 
+    r.test_attempt && r.test_attempt.passed === true
+  ).length;
+  const screeningFailedCount = registrations.filter(r => 
+    r.test_attempt && r.test_attempt.passed === false
+  ).length;
   const projectsSubmittedCount = registrations.filter(r => 
     r.presentation_status === 'submitted' || r.presentation_status === 'reviewed'
   ).length;
@@ -29,7 +39,7 @@ export function SummaryCards({ registrations }: SummaryCardsProps) {
   const runnersUpCount = registrations.filter(r => r.award_type === 'runner_up').length;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9 gap-4 mb-6">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
@@ -57,6 +67,26 @@ export function SummaryCards({ registrations }: SummaryCardsProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-blue-600">{screeningCompletedCount}</div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Screening Passed</CardTitle>
+          <ThumbsUp className="h-4 w-4 text-emerald-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-emerald-500">{screeningPassedCount}</div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Screening Failed</CardTitle>
+          <ThumbsDown className="h-4 w-4 text-red-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-red-500">{screeningFailedCount}</div>
         </CardContent>
       </Card>
       

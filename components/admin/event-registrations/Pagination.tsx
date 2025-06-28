@@ -65,7 +65,7 @@ export function Pagination({
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-700">Rows per page:</span>
           <Select value={itemsPerPage.toString()} onValueChange={(value) => onItemsPerPageChange(Number(value))}>
-            <SelectTrigger className="w-20">
+            <SelectTrigger className="w-24">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -73,6 +73,7 @@ export function Pagination({
               <SelectItem value="25">25</SelectItem>
               <SelectItem value="50">50</SelectItem>
               <SelectItem value="100">100</SelectItem>
+              <SelectItem value="400">400</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -89,7 +90,7 @@ export function Pagination({
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-700">Rows per page:</span>
           <Select value={itemsPerPage.toString()} onValueChange={(value) => onItemsPerPageChange(Number(value))}>
-            <SelectTrigger className="w-20">
+            <SelectTrigger className="w-24">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -97,6 +98,7 @@ export function Pagination({
               <SelectItem value="25">25</SelectItem>
               <SelectItem value="50">50</SelectItem>
               <SelectItem value="100">100</SelectItem>
+              <SelectItem value="400">400</SelectItem>
             </SelectContent>
           </Select>
         </div>

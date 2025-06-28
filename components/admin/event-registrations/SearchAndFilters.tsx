@@ -64,6 +64,8 @@ export function SearchAndFilters({
                 <SelectItem value="not_attended">Not Attended</SelectItem>
                 <SelectItem value="screening_completed">Screening Completed</SelectItem>
                 <SelectItem value="screening_pending">Screening Pending</SelectItem>
+                <SelectItem value="screening_passed">Screening Passed</SelectItem>
+                <SelectItem value="screening_failed">Screening Failed</SelectItem>
                 <SelectItem value="presentation_submitted">Presentation Submitted</SelectItem>
                 <SelectItem value="qualified">Qualified</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
