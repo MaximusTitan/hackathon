@@ -7,28 +7,16 @@ import dynamic from "next/dynamic";
 import { CalendarIcon, MapPin, Clock, Users, Share2 } from "lucide-react";
 import { Facepile } from "@/components/ui/facepile";
 import { Button } from "@/components/ui/button";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { toast } from "sonner";
-
-// Lazy load heavy components
-const Dialog = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.Dialog })), {
-  ssr: false
-});
-const DialogContent = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogContent })), {
-  ssr: false
-});
-const DialogHeader = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogHeader })), {
-  ssr: false
-});
-const DialogTitle = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogTitle })), {
-  ssr: false
-});
-const DialogTrigger = dynamic(() => import("@/components/ui/dialog").then(mod => ({ default: mod.DialogTrigger })), {
-  ssr: false
-});
-const ScrollArea = dynamic(() => import("@/components/ui/scroll-area").then(mod => ({ default: mod.ScrollArea })), {
-  ssr: false
-});
 
 type Participant = {
   id: string;
@@ -78,6 +66,16 @@ export default function Home() {
   const [selectedEventParticipants, setSelectedEventParticipants] = useState<Participant[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [dialogParticipantsLoading, setDialogParticipantsLoading] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  
+  // Pagination state for dialog
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalParticipants, setTotalParticipants] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
+  const participantsPerPage = 10;
   
   // Store participant data separately with loading states
   const [participantData, setParticipantData] = useState<Record<string, ParticipantData>>({});
@@ -402,21 +400,54 @@ export default function Home() {
     }
     return "Location TBD";
   };
-  // Fetch full participant list only when dialog is opened
-  const handleFacepileClick = async (event: Event) => {
-    setDialogOpen(true);
-    setSelectedEventParticipants([]); // Clear previous
+  // Fetch participants with pagination
+  const fetchParticipants = async (eventId: string, page: number = 1) => {
+    setDialogParticipantsLoading(true);
     try {
-      const res = await fetch(`/api/events/${event.id}/participants`);
+      const res = await fetch(`/api/events/${eventId}/participants?page=${page}&limit=${participantsPerPage}`);
       if (res.ok) {
         const data = await res.json();
         setSelectedEventParticipants(data.participants || []);
+        setCurrentPage(data.pagination.page);
+        setTotalPages(data.pagination.totalPages);
+        setTotalParticipants(data.pagination.total);
+        setHasNextPage(data.pagination.hasNext);
+        setHasPrevPage(data.pagination.hasPrev);
       } else {
         setSelectedEventParticipants([]);
+        setCurrentPage(1);
+        setTotalPages(1);
+        setTotalParticipants(0);
+        setHasNextPage(false);
+        setHasPrevPage(false);
       }
     } catch {
       setSelectedEventParticipants([]);
-    }  };
+      setCurrentPage(1);
+      setTotalPages(1);
+      setTotalParticipants(0);
+      setHasNextPage(false);
+      setHasPrevPage(false);
+    } finally {
+      setDialogParticipantsLoading(false);
+    }
+  };
+
+  // Handle facepile click - open dialog and fetch first page
+  const handleFacepileClick = async (event: Event) => {
+    setDialogOpen(true);
+    setSelectedEventId(event.id);
+    setSelectedEventParticipants([]); // Clear previous
+    setCurrentPage(1); // Reset to first page
+    await fetchParticipants(event.id, 1);
+  };
+
+  // Handle pagination
+  const handlePageChange = async (newPage: number) => {
+    if (selectedEventId && newPage >= 1 && newPage <= totalPages) {
+      await fetchParticipants(selectedEventId, newPage);
+    }
+  };
 
   // Handle event sharing by copying link to clipboard
   const handleShareEvent = async (event: Event) => {
@@ -706,6 +737,7 @@ export default function Home() {
                                   maxVisible={4}
                                   size="sm"
                                   showCount={true}
+                                  totalCount={eventParticipantData?.count}
                                 />
                               )}
                             </div>
@@ -716,13 +748,19 @@ export default function Home() {
                                 <Users className="w-5 h-5 text-rose-500" />
                                 {showPastEvents ? "Event Participants" : "Registered Participants"}
                                 <span className="text-base text-gray-500 font-normal">
-                                  ({selectedEventParticipants.length})
+                                  ({totalParticipants > 0 ? totalParticipants : selectedEventParticipants.length})
                                 </span>
                               </DialogTitle>
                             </DialogHeader>
+                            
                             <ScrollArea className="max-h-96">
                               <div className="space-y-3">
-                                {selectedEventParticipants.length === 0 ? (
+                                {dialogParticipantsLoading ? (
+                                  <div className="flex flex-col items-center justify-center py-8">
+                                    <div className="w-8 h-8 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                                    <p className="text-gray-500 text-sm">Loading participants...</p>
+                                  </div>
+                                ) : selectedEventParticipants.length === 0 ? (
                                   <p className="text-gray-500 text-center py-4">
                                     {showPastEvents ? "No participants found." : "No participants registered yet."}
                                   </p>
@@ -762,6 +800,38 @@ export default function Home() {
                                 )}
                               </div>
                             </ScrollArea>
+                            
+                            {/* Pagination controls at bottom */}
+                            {totalPages > 1 && !dialogParticipantsLoading && (
+                              <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100">
+                                <span className="text-sm text-gray-500">
+                                  Showing {Math.min((currentPage - 1) * participantsPerPage + 1, totalParticipants)} - {Math.min(currentPage * participantsPerPage, totalParticipants)} of {totalParticipants}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePageChange(currentPage - 1)}
+                                    disabled={!hasPrevPage}
+                                    className="h-8 px-3"
+                                  >
+                                    Previous
+                                  </Button>
+                                  <span className="text-sm text-gray-500 px-2">
+                                    {currentPage} / {totalPages}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePageChange(currentPage + 1)}
+                                    disabled={!hasNextPage}
+                                    className="h-8 px-3"
+                                  >
+                                    Next
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           </DialogContent>
                         </Dialog>                      </div>
                       <div className="flex items-center gap-3">

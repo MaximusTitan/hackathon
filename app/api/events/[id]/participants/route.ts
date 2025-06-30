@@ -4,7 +4,24 @@ import { createClient } from "@/utils/supabase/server";
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await createClient();
   const { id: eventId } = await params;
+  
+  // Get pagination parameters from URL
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get('page') || '1');
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const offset = (page - 1) * limit;
 
+  // Get total count first
+  const { count, error: countError } = await supabase
+    .from("registrations")
+    .select("*", { count: 'exact', head: true })
+    .eq("event_id", eventId);
+
+  if (countError) {
+    return NextResponse.json({ error: countError.message }, { status: 500 });
+  }
+
+  // Get paginated participants
   const { data: participants, error } = await supabase
     .from("registrations")
     .select(`
@@ -15,7 +32,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       user_linkedin
     `)
     .eq("event_id", eventId)
-    .order("registered_at", { ascending: true });
+    .order("registered_at", { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -53,5 +71,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       photo_url: photoMap[p.user_id] || null,
     })) || [];
 
-  return NextResponse.json({ participants: participantsWithPhoto });
+  return NextResponse.json({ 
+    participants: participantsWithPhoto,
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit),
+      hasNext: offset + limit < (count || 0),
+      hasPrev: page > 1
+    }
+  });
 }

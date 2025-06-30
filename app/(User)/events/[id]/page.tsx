@@ -100,6 +100,36 @@ export default function EventDetailsPage() {
     setCurrentPage(1); // Reset to first page when changing items per page
   };
 
+  // Helper function to determine if an event is in the past
+  const isEventInPast = (event: Event) => {
+    if (!event) return false;
+    
+    // If any TBA field is true, treat as upcoming (not past)
+    if (event.date_tba || event.time_tba || event.venue_tba) {
+      return false;
+    }
+    
+    // If no start_date, treat as upcoming (not past)
+    if (!event.start_date) {
+      return false;
+    }
+    
+    // Parse the event date safely
+    const eventDate = new Date(event.start_date);
+    
+    // Check if the date is valid
+    if (isNaN(eventDate.getTime())) {
+      console.warn(`Invalid date for event ${event.id}: ${event.start_date}`);
+      return false; // Treat invalid dates as upcoming (not past)
+    }
+    
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Set to start of today
+    eventDate.setHours(0, 0, 0, 0); // Set to start of event date
+    
+    return eventDate < currentDate; // Event is in the past if its date is before today
+  };
+  
   // Function to determine if param is an ID (UUID) or title slug
   const isUUID = (str: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -642,74 +672,95 @@ export default function EventDetailsPage() {
             )}
           </Suspense>          {/* Registration Button */}
           <div className="mt-8 mb-8 flex flex-col sm:flex-row gap-3">
-              {!user ? (
-                <>
-                  <button
-                    className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
-                    onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/events/${eventParam}`)}`)}
-                  >
-                    Sign in to Register
-                  </button>
-                  <button
-                    onClick={handleShareEvent}
-                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Event
-                  </button>
-                </>
-              ) : registered ? (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    className="bg-rose-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
-                    disabled
-                  >
-                    Registered
-                  </button>
-                  <button
-                    onClick={handleShareEvent}
-                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Event
-                  </button>
-                  {attended && event?.show_start_button !== false && (
-                    <Link
-                      href={`/event-workflow/${event?.id}`}
-                      className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
-                    >
-                      Enter Event
-                      <ExternalLink className="w-4 h-4" />
-                    </Link>
-                  )}
+            {isEventInPast(event) ? (
+              // Past event - only show share button and past event indicator
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="bg-gray-500 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  Event Completed
                 </div>
-              ) : (
-                <>
-                  <button
-                    className={`${
-                      event?.is_paid ? "bg-rose-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
-                    } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
-                      registering ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                    onClick={handleRegister}
-                    disabled={registering}
-                  >
-                    {registering 
-                      ? "Processing..." 
-                      : event?.is_paid && event?.price
-                        ? `Pay ₹${event.price} & Register`
-                        : "Register for Event"
-                    }
-                  </button>
-                  <button
-                    onClick={handleShareEvent}
-                    className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share Event
-                  </button>
-                </>              )}
-            </div>
+                <button
+                  onClick={handleShareEvent}
+                  className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share Event
+                </button>
+              </div>
+            ) : (
+              // Upcoming event - show registration buttons
+              <>
+                {!user ? (
+                  <>
+                    <button
+                      className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium"
+                      onClick={() => router.push(`/sign-in?returnUrl=${encodeURIComponent(`/events/${eventParam}`)}`)}
+                    >
+                      Sign in to Register
+                    </button>
+                    <button
+                      onClick={handleShareEvent}
+                      className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share Event
+                    </button>
+                  </>
+                ) : registered ? (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      className="bg-rose-600 text-white py-3 px-6 rounded-lg font-medium cursor-not-allowed"
+                      disabled
+                    >
+                      Registered
+                    </button>
+                    <button
+                      onClick={handleShareEvent}
+                      className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share Event
+                    </button>
+                    {attended && event?.show_start_button !== false && (
+                      <Link
+                        href={`/event-workflow/${event?.id}`}
+                        className="bg-rose-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                      >
+                        Enter Event
+                        <ExternalLink className="w-4 h-4" />
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      className={`${
+                        event?.is_paid ? "bg-rose-600 hover:bg-green-700" : "bg-rose-600 hover:bg-rose-700"
+                      } text-white py-3 px-6 rounded-lg transition-colors font-medium ${
+                        registering ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                      onClick={handleRegister}
+                      disabled={registering}
+                    >
+                      {registering 
+                        ? "Processing..." 
+                        : event?.is_paid && event?.price
+                          ? `Pay ₹${event.price} & Register`
+                          : "Register for Event"
+                      }
+                    </button>
+                    <button
+                      onClick={handleShareEvent}
+                      className="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-lg transition-colors font-medium inline-flex items-center gap-2"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Share Event
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Past Event Gallery - Always show to all users, admin controls only for admins */}
           <Suspense fallback={<div className="mb-8 h-48 bg-gray-100 rounded-lg animate-pulse"></div>}>

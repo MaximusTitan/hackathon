@@ -9,13 +9,15 @@ interface FacepileProps {
   maxVisible?: number;
   size?: "sm" | "md" | "lg";
   showCount?: boolean;
+  totalCount?: number; // Add custom total count prop
 }
 
 export function Facepile({ 
   participants, 
   maxVisible = 3, 
   size = "sm", 
-  showCount = true 
+  showCount = true,
+  totalCount 
 }: FacepileProps) {
   const sizeClasses = {
     sm: "w-6 h-6 text-xs",
@@ -24,9 +26,10 @@ export function Facepile({
   };
 
   const visibleParticipants = participants.slice(0, maxVisible);
-  const remainingCount = Math.max(0, participants.length - maxVisible);
+  const actualTotalCount = totalCount ?? participants.length;
+  const remainingCount = Math.max(0, actualTotalCount - maxVisible);
 
-  if (participants.length === 0) {
+  if (actualTotalCount === 0) {
     return (
       <div className="flex items-center gap-2">
         <div className="flex">
@@ -79,7 +82,7 @@ export function Facepile({
       
       {showCount && (
         <span className="text-sm text-gray-600">
-          {participants.length} participant{participants.length === 1 ? "" : "s"}
+          {actualTotalCount} participant{actualTotalCount === 1 ? "" : "s"}
         </span>
       )}
     </div>
