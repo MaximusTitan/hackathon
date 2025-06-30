@@ -12,3 +12,4 @@ export { NotesViewDialog } from './NotesViewDialog';
 export { MCQCreatorDialog } from './MCQCreatorDialog';
 export { MCQSenderDialog } from './MCQSenderDialog';
 export { Pagination } from './Pagination';
+export { ExportButton } from './ExportButton';

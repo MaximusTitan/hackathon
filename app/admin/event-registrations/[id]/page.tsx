@@ -17,7 +17,8 @@ import {
   NotesViewDialog,
   MCQCreatorDialog,
   MCQSenderDialog,
-  Pagination
+  Pagination,
+  ExportButton
 } from "@/components/admin/event-registrations";
 import type {
   Event,
@@ -96,6 +97,7 @@ export default function EventRegistrationsPage() {
   const [submittingNotes, setSubmittingNotes] = useState(false);
   const [submittingScore, setSubmittingScore] = useState(false);
   const [updatingBulkAttendance, setUpdatingBulkAttendance] = useState(false);
+  const [exportData, setExportData] = useState<EventRegistration[]>([]);
 
   // Table sorting/filtering state
   const [sortBy, setSortBy] = useState<string>('registered_at');
@@ -527,6 +529,39 @@ export default function EventRegistrationsPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!eventId) return;
+    
+    try {
+      // Fetch all registrations for export using dedicated export endpoint
+      const res = await fetch(
+        `/api/admin/event-registrations/export?event_id=${eventId}&search=${encodeURIComponent(debouncedSearchTerm)}&filter=${filterStatus}&sort=${sortBy}&order=${sortOrder}`
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+        setExportData(data.registrations);
+        toast.success(`Fetched ${data.registrations.length} registrations for export`);
+      } else {
+        toast.error('Failed to fetch export data');
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.error('Error exporting data');
+    }
+  };
+
+  // Clear export data after export is complete
+  useEffect(() => {
+    if (exportData.length > 0) {
+      const timer = setTimeout(() => {
+        setExportData([]);
+      }, 3000); // Clear after 3 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [exportData]);
+
   // Status badge helper
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -596,6 +631,10 @@ export default function EventRegistrationsPage() {
               }}
               filteredCount={totalCount}
               totalCount={totalCount}
+              registrations={registrations}
+              eventTitle={event?.title}
+              onExport={handleExport}
+              exportData={exportData}
             />
 
             {/* Summary Cards */}

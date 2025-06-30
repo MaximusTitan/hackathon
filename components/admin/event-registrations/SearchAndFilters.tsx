@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Filter, Search } from "lucide-react";
+import { ExportButton } from "./ExportButton";
+import type { EventRegistration } from "@/types/event";
 
 interface SearchAndFiltersProps {
   searchTerm: string;
@@ -15,6 +17,10 @@ interface SearchAndFiltersProps {
   onClearFilters: () => void;
   filteredCount: number;
   totalCount: number;
+  registrations?: EventRegistration[];
+  eventTitle?: string;
+  onExport?: () => void;
+  exportData?: EventRegistration[];
 }
 
 export function SearchAndFilters({
@@ -26,7 +32,11 @@ export function SearchAndFilters({
   onToggleFilters,
   onClearFilters,
   filteredCount,
-  totalCount
+  totalCount,
+  registrations = [],
+  eventTitle,
+  onExport,
+  exportData
 }: SearchAndFiltersProps) {
   return (
     <div className="mb-6 space-y-4">
@@ -50,6 +60,13 @@ export function SearchAndFilters({
             <Filter className="h-4 w-4" />
             Filters
           </Button>
+
+          <ExportButton 
+            registrations={registrations}
+            eventTitle={eventTitle}
+            onExport={onExport}
+            exportData={exportData}
+          />
         </div>
 
         {showFilters && (
