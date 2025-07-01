@@ -94,32 +94,32 @@ export function RegistrationsTable({
 
   return (
     <div className="overflow-x-auto">
-      <Table className="w-full min-w-[1600px]">
+      <Table className="w-full min-w-[1700px]">
         <TableHeader>
             <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={registrations.length > 0 && registrations.every(reg => selectedRegistrationIds.includes(reg.id))}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      registrations.forEach(reg => onSelect(reg.id, true));
-                    } else {
-                      registrations.forEach(reg => onSelect(reg.id, false));
-                    }
-                  }}
-                />
-              </TableHead>
-              <TableHead className="w-16">No.</TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none min-w-[120px]"
+                className="cursor-pointer hover:bg-gray-50 select-none w-[280px] sticky left-0 z-20 bg-white border-r shadow-sm p-0"
                 onClick={() => onSort('name')}
               >
-                <div className="flex items-center gap-1">
-                  Name {getSortIcon('name')}
+                <div className="px-2 py-3 flex items-center gap-3">
+                  <Checkbox
+                    checked={registrations.length > 0 && registrations.every(reg => selectedRegistrationIds.includes(reg.id))}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        registrations.forEach(reg => onSelect(reg.id, true));
+                      } else {
+                        registrations.forEach(reg => onSelect(reg.id, false));
+                      }
+                    }}
+                  />
+                  <span className="text-sm font-medium">No.</span>
+                  <span className="flex items-center gap-1">
+                    Name {getSortIcon('name')}
+                  </span>
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-gray-50 select-none min-w-[200px]"
+                className="cursor-pointer hover:bg-gray-50 select-none min-w-[200px] pl-4"
                 onClick={() => onSort('email')}
               >
                 <div className="flex items-center gap-1">
@@ -171,18 +171,22 @@ export function RegistrationsTable({
           <TableBody>
             {registrations.map((reg, idx) => (
               <TableRow key={reg.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedRegistrationIds.includes(reg.id)}
-                    onCheckedChange={(checked) => onSelect(reg.id, checked as boolean)}
-                    disabled={!reg.attended || (reg.screening_status && reg.screening_status !== 'pending')}
-                  />
+                <TableCell className="font-medium w-[280px] sticky left-0 z-10 bg-white border-r shadow-sm p-0">
+                  <div className="px-2 py-2 flex items-center gap-3">
+                    <Checkbox
+                      checked={selectedRegistrationIds.includes(reg.id)}
+                      onCheckedChange={(checked) => onSelect(reg.id, checked as boolean)}
+                      disabled={!reg.attended || (reg.screening_status && reg.screening_status !== 'pending')}
+                    />
+                    <span className="text-sm text-gray-700 min-w-[30px] flex-shrink-0">
+                      {(currentPage - 1) * itemsPerPage + idx + 1}
+                    </span>
+                    <span className="text-sm break-words leading-tight">
+                      {reg.user?.name || "N/A"}
+                    </span>
+                  </div>
                 </TableCell>
-                <TableCell className="px-4 py-2 text-sm text-gray-700">
-                  {(currentPage - 1) * itemsPerPage + idx + 1}
-                </TableCell>
-                <TableCell className="font-medium">{reg.user?.name || "N/A"}</TableCell>
-                <TableCell>{reg.user?.email || "N/A"}</TableCell>
+                <TableCell className="pl-4">{reg.user?.email || "N/A"}</TableCell>
                 <TableCell>
                   {reg.user?.linkedin ? (
                     <a 
