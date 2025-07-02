@@ -108,7 +108,7 @@ export async function GET(request: Request) {
         query = query.eq('qualification_status', 'rejected');
         break;
       case 'qualification_pending':
-        query = query.in('presentation_status', ['submitted', 'reviewed']).in('qualification_status', ['pending', null]);
+        query = query.eq('presentation_status', 'submitted').is('qualification_status', null);
         break;
       case 'winners':
         query = query.eq('award_type', 'winner');
