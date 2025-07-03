@@ -25,6 +25,7 @@ type WorkflowData = {
     id: string;
     title: string;
     project_instructions?: string | null;
+    show_start_button?: boolean;
   };
   registration: {
     id: string;
@@ -523,8 +524,8 @@ export default function EventWorkflowPage() {
           </Card>
         )}
 
-        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped */}
-        {shouldShowStep2() && (
+        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped AND start button is enabled */}
+        {shouldShowStep2() && event.show_start_button && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -591,7 +592,35 @@ export default function EventWorkflowPage() {
               </form>
             </CardContent>
           </Card>
-        )}        {/* Step 2 Blocked Message - Show when user failed the test */}
+        )}
+
+        {/* Step 2 Disabled Message - Show when start button is disabled by admin */}
+        {shouldShowStep2() && !event.show_start_button && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardDescription>
+                    Temporarily Disabled
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-orange-700 bg-orange-50 p-4 rounded-lg">
+                <p className="font-semibold">⏸️ Project Submission Disabled</p>
+                <p className="mt-2">
+                  Project submission has been temporarily disabled by the admin. 
+                  Please check back later or contact the admin for more information.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 2 Blocked Message - Show when user failed the test */}
         {!shouldShowStep2() && registration.screening_status === 'completed' && workflowData.test_result && !workflowData.test_result.passed && (
           <Card>
             <CardHeader>
