@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndUser } from "@/utils/supabase/require-session";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
@@ -11,14 +11,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required parameters" }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    
-    // Use getUser for secure authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "User authentication failed" }, { status: 401 });
-    }    // Get event details
+  const result = await getSupabaseAndUser();
+  if (!result.ok) return result.res;
+  const { supabase, user } = result;    // Get event details
     const { data: event, error: eventError } = await supabase
       .from("events")
       .select("*")

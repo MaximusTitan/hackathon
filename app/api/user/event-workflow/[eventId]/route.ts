@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(
   request: Request,
@@ -8,88 +8,88 @@ export async function GET(
   try {
     const { eventId } = await params;
 
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
-    // Get event details
-    const { data: event, error: eventError } = await supabase
-      .from('events')
-      .select('id, title, project_instructions, show_start_button')
-      .eq('id', eventId)
-      .single();
+    // Get event details and the user's registration in parallel
+    const [eventRes, regRes] = await Promise.all([
+      supabase
+        .from('events')
+        .select('id, title, project_instructions, show_start_button')
+        .eq('id', eventId)
+        .single(),
+      supabase
+        .from('registrations')
+        .select(`
+          id,
+          attended,
+          screening_status,
+          screening_test_id,
+          presentation_status,
+          github_link,
+          deployment_link,
+          presentation_link,
+          presentation_notes
+        `)
+        .eq('event_id', eventId)
+        .eq('user_id', session.user.id)
+        .single(),
+    ]);
+
+    const { data: event, error: eventError } = eventRes as any;
+    const { data: registration, error: regError } = regRes as any;
 
     if (eventError) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Get user's registration for this event
-    const { data: registration, error: regError } = await supabase
-      .from('registrations')
-      .select(`
-        id,
-        attended,
-        screening_status,
-        screening_test_id,
-        presentation_status,
-        github_link,
-        deployment_link,
-        presentation_link,
-        presentation_notes
-      `)
-      .eq('event_id', eventId)
-      .eq('user_id', session.user.id)
-      .single();
-
     if (regError) {
       return NextResponse.json({ error: "Registration not found" }, { status: 404 });
-    }    // Get screening test if applicable
+    }
+
+    // Get screening test if applicable
     let screening_test = null;
     let test_result = null;
     
-    if (registration.screening_test_id) {
-      const { data: testData } = await supabase
-        .from('screening_tests')
-        .select('id, mcq_link, instructions, deadline')
-        .eq('id', registration.screening_test_id)
-        .single();
-      
+    if ((registration as any).screening_test_id) {
+      const [testDataRes, attemptDataRes] = await Promise.all([
+        supabase
+          .from('screening_tests')
+          .select('id, mcq_link, instructions, deadline, passing_score')
+          .eq('id', (registration as any).screening_test_id)
+          .single(),
+        (registration as any).screening_status === 'completed'
+          ? supabase
+              .from('user_test_attempts')
+              .select('score, total_questions, submitted_at')
+              .eq('user_id', (session as any).user.id)
+              .eq('screening_test_id', (registration as any).screening_test_id)
+              .eq('status', 'submitted')
+              .order('submitted_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      const testData = (testDataRes as any).data;
       screening_test = testData;
 
-      // Get test result if user has completed the test
-      if (registration.screening_status === 'completed') {
-        const { data: attemptData } = await supabase
-          .from('user_test_attempts')
-          .select('score, total_questions, submitted_at')
-          .eq('user_id', session.user.id)
-          .eq('screening_test_id', registration.screening_test_id)
-          .eq('status', 'submitted')
-          .order('submitted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      const attemptData = (attemptDataRes as any).data as
+        | { score: number; total_questions: number; submitted_at: string }
+        | null;
 
-        if (attemptData && testData) {
-          // Get the passing score from screening test
-          const { data: fullTestData } = await supabase
-            .from('screening_tests')
-            .select('passing_score')
-            .eq('id', registration.screening_test_id)
-            .single();          const passingScore = fullTestData?.passing_score || 70;
-          // Score is already stored as a percentage in the database
-          const scorePercentage = attemptData.score;
+      if (attemptData && testData) {
+        const passingScore = testData?.passing_score ?? 70;
+        const scorePercentage = attemptData.score;
 
-          test_result = {
-            score: attemptData.score,
-            total_questions: attemptData.total_questions,
-            passing_score: passingScore,
-            passed: scorePercentage >= passingScore,
-            submitted_at: attemptData.submitted_at
-          };
-        }
+        test_result = {
+          score: attemptData.score,
+          total_questions: attemptData.total_questions,
+          passing_score: passingScore,
+          passed: scorePercentage >= passingScore,
+          submitted_at: attemptData.submitted_at,
+        };
       }
     }
 

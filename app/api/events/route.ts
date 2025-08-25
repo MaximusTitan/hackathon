@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
   const url = new URL(request.url);
   const withCount = url.searchParams.get("with_participant_count");
 
-  // Check if user is admin using getUser instead of getSession
-  let isAdmin = false;
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (user) {
-      // Only treat as admin if explicitly set as admin role
-      isAdmin = user.user_metadata?.role === 'admin';
-    }
-  } catch (error) {
-    console.error("Error authenticating user:", error);
-  }
+  // Try to get session; if not available, proceed anonymously.
+  const sessionResult = await getSupabaseAndSession();
+  const isSession = sessionResult.ok;
+  const isAdmin = isSession && (sessionResult as any).session.user.user_metadata?.role === 'admin';
+  // Use supabase from session when available, else create a public client
+  const supabase = isSession ? (sessionResult as any).supabase : await createClient();
 
   // If admin, get all events, if not, only get public events
   const query = supabase
@@ -33,7 +27,10 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error('Database error:', error);
-    return NextResponse.json({ events: [] }, { status: 500 });
+    return NextResponse.json(
+      { events: [] },
+      { status: 500, headers: { "Cache-Control": "s-maxage=30" } }
+    );
   }
 
   if (withCount) {
@@ -58,10 +55,17 @@ export async function GET(request: Request) {
       participant_count: countMap[event.id] || 0,
     }));
 
-    return NextResponse.json({ events: eventsWithCount });
+    // Add cache headers only for public responses
+    const headers = !isAdmin
+      ? { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" }
+      : undefined as any;
+    return NextResponse.json({ events: eventsWithCount }, { headers });
   }
 
-  return NextResponse.json({ events });
+  const headers = !isAdmin
+    ? { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" }
+    : undefined as any;
+  return NextResponse.json({ events }, { headers });
 }
 
 export async function POST(request: Request) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndUser } from "@/utils/supabase/require-session";
 
 export async function POST(request: Request) {
   try {
@@ -9,14 +9,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Event ID is required" }, { status: 400 });
     }
 
-    const supabase = await createClient();
-    
-    // Use getUser instead of getSession for secure authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "User authentication failed" }, { status: 401 });
-    }
+  const result = await getSupabaseAndUser();
+  if (!result.ok) return result.res;
+  const { supabase, user } = result;
 
     const userId = user.id;
     

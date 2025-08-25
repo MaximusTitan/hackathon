@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function POST(request: Request) {
   try {
@@ -19,13 +19,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
     // Get the screening test to calculate score
     const { data: screeningTest, error: testError } = await supabase
@@ -114,31 +110,20 @@ export async function POST(request: Request) {
     // Update registration status
     const newScreeningStatus = score >= screeningTest.passing_score ? 'completed' : 'completed';
     
-    const { error: updateRegError } = await supabase
-      .from('registrations')
-      .update({
-        screening_status: newScreeningStatus
-      })
-      .eq('id', registration.id);
-
-    if (updateRegError) {
-      console.error('Error updating registration status:', updateRegError);
-      // Don't fail the entire request for this
-    }
-
-    // Update workflow
-    const { error: workflowError } = await supabase
-      .from('user_event_workflow')
-      .update({
-        screening_submitted_at: new Date().toISOString()
-      })
-      .eq('user_id', session.user.id)
-      .eq('event_id', event_id);
-
-    if (workflowError) {
-      console.error('Error updating workflow:', workflowError);
-      // Don't fail the entire request for this
-    }
+    // Update registration status and workflow (non-critical updates); log errors but do not fail request
+    await Promise.all([
+      supabase
+        .from('registrations')
+        .update({ screening_status: newScreeningStatus })
+        .eq('id', registration.id)
+        .then(({ error }) => { if (error) console.error('Error updating registration status:', error); }),
+      supabase
+        .from('user_event_workflow')
+        .update({ screening_submitted_at: new Date().toISOString() })
+        .eq('user_id', session.user.id)
+        .eq('event_id', event_id)
+        .then(({ error }) => { if (error) console.error('Error updating workflow:', error); }),
+    ]);
 
     const passed = score >= screeningTest.passing_score;
 

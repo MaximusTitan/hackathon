@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { session } = result;
 
-  return NextResponse.json({ 
-    bucket: "event-images",
-    user_id: user.id 
-  });
+  return NextResponse.json({ bucket: "event-images", user_id: session.user.id });
 }

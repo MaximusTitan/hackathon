@@ -14,7 +14,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (countError) {
       console.error("Error getting participant count:", countError);
-      return NextResponse.json({ count: 0, participants: [] });
+      return NextResponse.json(
+        { count: 0, participants: [] },
+        { headers: { "Cache-Control": "s-maxage=30" } }
+      );
     }
 
     // Get first 6 participants with basic info for preview
@@ -31,7 +34,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     if (error) {
       console.error("Error getting participants:", error);
-      return NextResponse.json({ count: count || 0, participants: [] });
+      return NextResponse.json(
+        { count: count || 0, participants: [] },
+        { headers: { "Cache-Control": "s-maxage=30" } }
+      );
     }
 
     // Fetch profile photos for these participants
@@ -64,12 +70,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         photo_url: photoMap[p.user_id] || null,
       })) || [];
 
-    return NextResponse.json({ 
-      count: count || 0, 
-      participants: participantsWithPhoto 
-    });
+    return NextResponse.json(
+      { count: count || 0, participants: participantsWithPhoto },
+      { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" } }
+    );
   } catch (error) {
     console.error("Error in participants preview:", error);
-    return NextResponse.json({ count: 0, participants: [] });
+    return NextResponse.json(
+      { count: 0, participants: [] },
+      { headers: { "Cache-Control": "s-maxage=30" } }
+    );
   }
 }

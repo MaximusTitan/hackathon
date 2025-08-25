@@ -140,85 +140,39 @@ export default function AdminDashboard() {
         });
         setParticipantData(initialData);
 
-        // Load participant counts progressively (prioritize first 3 events)
-        const priorityEvents = filteredEvents.slice(0, 3);
-        const remainingEvents = filteredEvents.slice(3);
-
-        // Load priority events first (no delay)
-        priorityEvents.forEach(async (event: Event, index: number) => {
-          try {
-            // Small stagger for priority events
-            if (index > 0) {
-              await new Promise(resolve => setTimeout(resolve, index * 50));
-            }
-            
-            const res = await fetch(`/api/events/${event.id}/participants/preview`);
-            if (res.ok) {
-              const data = await res.json();
-              setParticipantData(prev => ({
-                ...prev,
-                [event.id]: {
-                  count: data.count || 0,
-                  loading: false
-                }
-              }));
-            } else {
-              setParticipantData(prev => ({
-                ...prev,
-                [event.id]: {
-                  count: 0,
-                  loading: false
-                }
-              }));
-            }
-          } catch (error) {
-            console.error(`Error fetching participant count for priority event ${event.id}:`, error);
-            setParticipantData(prev => ({
-              ...prev,
-              [event.id]: {
-                count: 0,
-                loading: false
+        // Load participant counts in one batch request
+        try {
+          const ids = filteredEvents.map((e: Event) => e.id).join(",");
+          const res = await fetch(`/api/events/participants/preview-batch?ids=${encodeURIComponent(ids)}`);
+          if (res.ok) {
+            const payload: { results: Record<string, { count: number }> } = await res.json();
+            setParticipantData(prev => {
+              const next = { ...prev } as Record<string, { count: number; loading: boolean }>;
+              for (const e of filteredEvents) {
+                const r = payload.results?.[e.id];
+                next[e.id] = { count: r?.count || 0, loading: false };
               }
-            }));
-          }
-        });
-
-        // Load remaining events with slight delay
-        remainingEvents.forEach(async (event: Event, index: number) => {
-          try {
-            // Delay for remaining events to not interfere with priority loading
-            await new Promise(resolve => setTimeout(resolve, 300 + (index * 100)));
-            
-            const res = await fetch(`/api/events/${event.id}/participants/preview`);
-            if (res.ok) {
-              const data = await res.json();
-              setParticipantData(prev => ({
-                ...prev,
-                [event.id]: {
-                  count: data.count || 0,
-                  loading: false
-                }
-              }));
-            } else {
-              setParticipantData(prev => ({
-                ...prev,
-                [event.id]: {
-                  count: 0,
-                  loading: false
-                }
-              }));
-            }
-          } catch (error) {
-            console.error(`Error fetching participant count for event ${event.id}:`, error);
-            setParticipantData(prev => ({
-              ...prev,
-              [event.id]: {
-                count: 0,
-                loading: false
+              return next;
+            });
+          } else {
+            setParticipantData(prev => {
+              const next = { ...prev } as Record<string, { count: number; loading: boolean }>;
+              for (const e of filteredEvents) {
+                next[e.id] = { count: 0, loading: false };
               }
-            }));
+              return next;
+            });
           }
-        });
+        } catch (err) {
+          console.error("Batch count fetch failed:", err);
+          setParticipantData(prev => {
+            const next = { ...prev } as Record<string, { count: number; loading: boolean }>;
+            for (const e of filteredEvents) {
+              next[e.id] = { count: 0, loading: false };
+            }
+            return next;
+          });
+        }
 
       } catch (error) {
         console.error('Error fetching events:', error);
@@ -367,40 +321,24 @@ export default function AdminDashboard() {
       });
       setParticipantData(initialData);
 
-      // Load all participant counts
-      filteredEvents.forEach(async (event: Event, index: number) => {
-        try {
-          await new Promise<void>(resolve => setTimeout(resolve, index * 50));
-          
-          const res = await fetch(`/api/events/${event.id}/participants/preview`);
-          if (res.ok) {
-            const data = await res.json();
-            setParticipantData(prev => ({
-              ...prev,
-              [event.id]: {
-                count: data.count || 0,
-                loading: false
-              }
-            }));
-          } else {
-            setParticipantData(prev => ({
-              ...prev,
-              [event.id]: {
-                count: 0,
-                loading: false
-              }
-            }));
-          }
-        } catch (error) {
-          setParticipantData(prev => ({
-            ...prev,
-            [event.id]: {
-              count: 0,
-              loading: false
+      // Load all participant counts via batch endpoint
+      try {
+        const ids = filteredEvents.map((e: Event) => e.id).join(",");
+        const res = await fetch(`/api/events/participants/preview-batch?ids=${encodeURIComponent(ids)}`);
+        if (res.ok) {
+          const payload: { results: Record<string, { count: number }> } = await res.json();
+          setParticipantData(prev => {
+            const next = { ...prev } as Record<string, { count: number; loading: boolean }>;
+            for (const e of filteredEvents) {
+              const r = payload.results?.[e.id];
+              next[e.id] = { count: r?.count || 0, loading: false };
             }
-          }));
+            return next;
+          });
         }
-      });
+      } catch {
+        // ignore; already initialized
+      }
     }
   };
 

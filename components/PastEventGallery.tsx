@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Upload, X, Camera, Trash2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
-import { User } from "@supabase/supabase-js";
+import { useAuth } from "@/components/providers/auth-provider";
+import useSWR from "swr";
 
 type PastEventImage = {
   id: string;
@@ -27,62 +28,27 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [captions, setCaptions] = useState<{ [key: number]: string }>({});
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const { user: currentUser, role } = useAuth();
+  const [authChecked, setAuthChecked] = useState(true);
   const [selectedImage, setSelectedImage] = useState<PastEventImage | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     fetchPastEventImages();
-    // Only check auth if admin features are needed
-    if (isAdmin) {
-      checkUserAuth();
-    } else {
-      setAuthChecked(true);
-    }
   }, [eventId, isAdmin]);
 
-  // Check user authentication using the same method as header-nav
-  const checkUserAuth = async () => {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.getUser();
-      
-      if (error) {
-        console.error('Auth error:', error);
-        setCurrentUser(null);
-      } else {
-        setCurrentUser(data.user);
-        console.log('Auth check - User:', data.user ? 'authenticated' : 'not authenticated');
-        console.log('User role:', data.user?.user_metadata?.role);
-        console.log('User email:', data.user?.email);
-      }
-    } catch (error) {
-      console.error('Error checking user auth:', error);
-      setCurrentUser(null);
-    } finally {
-      setAuthChecked(true);
-    }
-  };
+  // useAuth already provides user; mark auth as checked
 
-  const fetchPastEventImages = async () => {
-    try {
-      console.log('Fetching past event images for event:', eventId);
-      const response = await fetch(`/api/events/${eventId}/past-images`);
-      console.log('Fetch response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched images data:', data);
-        setImages(data.images || []);
-      } else {
-        console.error('Failed to fetch images, status:', response.status);
-      }
-    } catch (error) {
-      console.error("Error fetching past event images:", error);
-    } finally {
-      setLoading(false);
-    }
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: swrData, isLoading, mutate } = useSWR(`/api/events/${eventId}/past-images`, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const fetchPastEventImages = () => {
+    setLoading(true);
+    // Reflect SWR cached data immediately if present
+    if (swrData?.images) setImages(swrData.images);
+    setLoading(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,12 +108,11 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     // Check if user is authenticated
     if (!currentUser) {
       toast.error("Please log in to upload images");
-      await checkUserAuth(); // Refresh auth state
       return;
     }
 
     // Check if user is admin
-    const userIsAdmin = currentUser.user_metadata?.role === 'admin' || currentUser.email === 'admin@hackon.com';
+  const userIsAdmin = role === 'admin' || currentUser.email === 'admin@hackon.com';
     if (!userIsAdmin) {
       toast.error("Admin access required to upload images");
       return;
@@ -163,11 +128,10 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       });
       formData.append('event_id', eventId);
 
-      const authHeaders = await getAuthHeaders();
+  const authHeaders = await getAuthHeaders();
 
       if (!authHeaders['Authorization']) {
         toast.error("Authentication failed. Please log in again.");
-        await checkUserAuth();
         return;
       }
 
@@ -186,7 +150,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
         setSelectedFiles([]);
         setCaptions({});
         setShowUploadForm(false);
-        fetchPastEventImages();
+  await mutate();
       } else {
         console.error('Upload error response:', responseData);
         toast.error(responseData.error || "Failed to upload images");
@@ -204,16 +168,14 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     // Check if user is authenticated
     if (!currentUser) {
       toast.error("Please log in to delete images");
-      await checkUserAuth();
       return;
     }
 
     try {
-      const authHeaders = await getAuthHeaders();
+  const authHeaders = await getAuthHeaders();
       
       if (!authHeaders['Authorization']) {
         toast.error("Authentication failed. Please log in again.");
-        await checkUserAuth();
         return;
       }
 
@@ -223,8 +185,8 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       });
 
       if (response.ok) {
-        toast.success("Image deleted successfully");
-        fetchPastEventImages();
+  toast.success("Image deleted successfully");
+  await mutate();
       } else {
         const error = await response.json();
         console.error('Delete error response:', error);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndUser } from "@/utils/supabase/require-session";
 
 export async function GET(request: Request) {
   try {
@@ -13,14 +13,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Use getUser instead of getSession for secure authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
+    const result = await getSupabaseAndUser();
+    if (!result.ok) {
       return NextResponse.json({ registered: false, authenticated: false });
     }
+    const { supabase, user } = result;
 
     const userId = user.id;
       // Check if user is registered for this event and get attendance status

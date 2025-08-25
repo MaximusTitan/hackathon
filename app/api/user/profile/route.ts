@@ -1,13 +1,11 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET() {
-  const supabase = await createClient();
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
   const { data: profile, error } = await supabase
     .from('user_profiles')
@@ -23,12 +21,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const supabase = await createClient();
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
   const updates = await request.json();
 

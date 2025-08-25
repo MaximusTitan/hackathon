@@ -2,57 +2,24 @@
 
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/utils/supabase/client";
-import { User } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/providers/auth-provider";
+import { signOutAction } from "@/app/actions";
 import { UserCircle2, LogOut } from "lucide-react";
 
-type UserProfile = {
-  photo_url?: string | null;
-  name?: string | null;
-};
-
 export default function HeaderNav() {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<string | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { user, role, profile, refreshAuth } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const pathname = usePathname();
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Auto-refresh auth on mount (helps with direct navigation)
   useEffect(() => {
-    const supabase = createClient();
-
-    // Fetch user on mount and on route change
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      setRole(data.user?.user_metadata?.role ?? null);
-
-      // Fetch user profile for photo_url
-      if (data.user) {
-        const { data: profileData } = await supabase
-          .from("user_profiles")
-          .select("photo_url, name")
-          .eq("id", data.user.id)
-          .single();
-        setProfile(profileData || {});
-      } else {
-        setProfile(null);
-      }
-    };
-    fetchUser();
-
-    // Listen for auth state changes
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      fetchUser();
-    });
-
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, [pathname]);
+    const timer = setTimeout(() => {
+      refreshAuth();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [refreshAuth]);
 
   useEffect(() => {
     // Close menu on outside click
@@ -72,9 +39,12 @@ export default function HeaderNav() {
   }, [menuOpen]);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/sign-in");
+    // Use server action to sign out so cookies/session are cleared consistently
+    try {
+      await signOutAction();
+    } catch {
+      router.push("/sign-in");
+    }
   }
 
   const getInitials = (name: string) => {
@@ -87,9 +57,17 @@ export default function HeaderNav() {
   };
 
   const profileHref =
-    user?.user_metadata?.role === "admin"
+    (role === "admin" || role == null || role === "")
       ? "/admin/profile"
       : "/profile";
+
+  // Align admin detection with middleware (admin, null, or empty role considered admin)
+  const isAdmin = (role === "admin" || role == null || role === "");
+
+  // Debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('HeaderNav Debug:', { user: !!user, role, isAdmin });
+  }
 
   return (
     <header className="w-full bg-white/80 border-b border-gray-200 shadow-sm mb-2 sticky top-0 z-50 backdrop-blur-sm">
@@ -108,7 +86,7 @@ export default function HeaderNav() {
           >
             Events
           </Link>
-          {user && role === "user" && (
+          {user && !isAdmin && (
             <Link
               href="/dashboard"
               className="text-gray-700 hover:text-rose-600 font-medium"
@@ -118,22 +96,7 @@ export default function HeaderNav() {
           )}
         </div>
         <div className="flex items-center gap-4">
-          {!user ? (
-            <>
-              <Link
-                href="/sign-in"
-                className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700 font-medium"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/sign-up"
-                className="px-4 py-2 rounded border border-rose-600 text-rose-600 hover:bg-rose-50 font-medium"
-              >
-                Sign Up
-              </Link>
-            </>
-          ) : (
+          {user ? (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
@@ -149,7 +112,7 @@ export default function HeaderNav() {
                       className="w-7 h-7 object-cover rounded-full"
                     />
                   ) : (
-                    getInitials(profile?.name || user.email || '')
+                    getInitials(profile?.name || user.email || 'U')
                   )}
                 </span>
               </button>
@@ -175,6 +138,21 @@ export default function HeaderNav() {
                 </div>
               )}
             </div>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700 font-medium"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/sign-up"
+                className="px-4 py-2 rounded border border-rose-600 text-rose-600 hover:bg-rose-50 font-medium"
+              >
+                Sign Up
+              </Link>
+            </>
           )}
         </div>
       </nav>

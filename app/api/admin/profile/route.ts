@@ -1,15 +1,11 @@
-import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
-    
-    // Get current user's session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const result = await getSupabaseAndSession();
+    if (!result.ok) return result.res;
+    const { supabase, session } = result;
 
     const { name, email } = await req.json();
 
@@ -40,12 +36,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const supabase = await createClient();
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
   // Verify admin role
   const isAdmin = session.user.user_metadata?.role === 'admin';
@@ -67,12 +60,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const supabase = await createClient();
-  
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
   // Verify admin role
   const isAdmin = session.user.user_metadata?.role === 'admin';

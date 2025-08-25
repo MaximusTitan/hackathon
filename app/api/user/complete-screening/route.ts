@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function POST(request: Request) {
   try {
@@ -12,13 +12,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
 
     // Update user's registration to mark screening as completed
     const { error } = await supabase
@@ -36,8 +32,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Update workflow table
-    await supabase
+  // Update workflow table (non-critical)
+  await supabase
       .from('user_event_workflow')
       .update({
         screening_submitted_at: new Date().toISOString()

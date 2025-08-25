@@ -166,113 +166,44 @@ export default function Home() {
         });
         setParticipantData(initialData);
 
-        // Load participant data progressively (prioritize first 3 events)
-        const priorityEvents = filteredEvents.slice(0, 3);
-        const remainingEvents = filteredEvents.slice(3);
-
-        // Load priority events first (no delay)
-        interface ParticipantPreviewResponse {
-          count: number;
-          participants: Participant[];
-        }
-
-        interface ParticipantDataUpdate {
-          count: number;
-          participants: Participant[];
-          loading: boolean;
-        }
-
-        priorityEvents.forEach(async (event: Event, index: number): Promise<void> => {
-          try {
-            // Small stagger for priority events
-            if (index > 0) {
-              await new Promise<void>(resolve => setTimeout(resolve, index * 50));
-            }
-            
-            const res: Response = await fetch(`/api/events/${event.id}/participants/preview`);
-            if (res.ok) {
-              const data: ParticipantPreviewResponse = await res.json();
-              setParticipantData((prev: Record<string, ParticipantData>) => ({
-          ...prev,
-          [event.id]: {
-            count: data.count || 0,
-            participants: data.participants || [],
-            loading: false
-          }
-              }));
-            } else {
-              setParticipantData((prev: Record<string, ParticipantData>) => ({
-          ...prev,
-          [event.id]: {
-            count: 0,
-            participants: [],
-            loading: false
-          }
-              }));
-            }
-          } catch (error: unknown) {
-            console.error(`Error fetching participant preview for priority event ${event.id}:`, error);
-            setParticipantData((prev: Record<string, ParticipantData>) => ({
-              ...prev,
-              [event.id]: {
-          count: 0,
-          participants: [],
-          loading: false
+        // Load participant data in one batch call to reduce N+1
+        try {
+          const ids = filteredEvents.map((e: Event) => e.id).join(",");
+          const res: Response = await fetch(`/api/events/participants/preview-batch?ids=${encodeURIComponent(ids)}`);
+          if (res.ok) {
+            const payload: { results: Record<string, { count: number; participants: Participant[] }> } = await res.json();
+            setParticipantData((prev: Record<string, ParticipantData>) => {
+              const next: Record<string, ParticipantData> = { ...prev };
+              for (const e of filteredEvents) {
+                const r = payload.results?.[e.id];
+                next[e.id] = {
+                  count: r?.count || 0,
+                  participants: r?.participants || [],
+                  loading: false,
+                };
               }
-            }));
+              return next;
+            });
+          } else {
+            // fallback: mark as loaded with zero
+            setParticipantData((prev: Record<string, ParticipantData>) => {
+              const next: Record<string, ParticipantData> = { ...prev };
+              for (const e of filteredEvents) {
+                next[e.id] = { count: 0, participants: [], loading: false };
+              }
+              return next;
+            });
           }
-        });
-
-        // Load remaining events with slight delay
-        interface ParticipantPreviewResponse {
-          count: number;
-          participants: Participant[];
+        } catch (err) {
+          console.error("Batch preview failed:", err);
+          setParticipantData((prev: Record<string, ParticipantData>) => {
+            const next: Record<string, ParticipantData> = { ...prev };
+            for (const e of filteredEvents) {
+              next[e.id] = { count: 0, participants: [], loading: false };
+            }
+            return next;
+          });
         }
-
-        interface ParticipantDataUpdate {
-          count: number;
-          participants: Participant[];
-          loading: boolean;
-        }
-
-                remainingEvents.forEach(async (event: Event, index: number): Promise<void> => {
-                  try {
-                    // Delay for remaining events to not interfere with priority loading
-                    await new Promise<void>(resolve => setTimeout(resolve, 300 + (index * 100)));
-                    
-                    const res: Response = await fetch(`/api/events/${event.id}/participants/preview`);
-                    if (res.ok) {
-                      const data: ParticipantPreviewResponse = await res.json();
-                      setParticipantData((prev: Record<string, ParticipantData>) => ({
-                        ...prev,
-                        [event.id]: {
-                          count: data.count || 0,
-                          participants: data.participants || [],
-                          loading: false
-                        }
-                      }));
-                    } else {
-                      setParticipantData((prev: Record<string, ParticipantData>) => ({
-                        ...prev,
-                        [event.id]: {
-                          count: 0,
-                          participants: [],
-                          loading: false
-                        }
-                      }));
-                    }
-                  } catch (error: unknown) {
-                    console.error(`Error fetching participant preview for event ${event.id}:`, error);
-                    setParticipantData((prev: Record<string, ParticipantData>) => ({
-                      ...prev,
-                      [event.id]: {
-                        count: 0,
-                        participants: [],
-                        loading: false
-                      }
-                    }));
-                  }
-                });
 
       } catch (error) {
         console.error('Error fetching events:', error);
@@ -289,61 +220,7 @@ export default function Home() {
     setShowImages(false);
   }, [showPastEvents]);
 
-  // Second useEffect: Fetch participant data after events are loaded
-  useEffect(() => {
-    if (events.length === 0) return;
-    
-    // Initialize loading state for all events
-    const initialData: Record<string, ParticipantData> = {};
-    events.forEach(event => {
-      initialData[event.id] = {
-        count: 0,
-        participants: [],
-        loading: true
-      };
-    });
-    setParticipantData(initialData);
-    
-    // Fetch participant data for each event progressively
-    events.forEach(async (event, index) => {
-      try {
-        // Add a small delay to stagger requests and avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, index * 100));
-        
-        const res = await fetch(`/api/events/${event.id}/participants/preview`);
-        if (res.ok) {
-          const data = await res.json();
-          setParticipantData(prev => ({
-            ...prev,
-            [event.id]: {
-              count: data.count || 0,
-              participants: data.participants || [],
-              loading: false
-            }
-          }));
-        } else {
-          // Set empty data if fetch fails
-          setParticipantData(prev => ({
-            ...prev,
-            [event.id]: {
-              count: 0,
-              participants: [],
-              loading: false
-            }
-          }));
-        }
-      } catch (error) {
-        console.error(`Error fetching participant preview for event ${event.id}:`, error);
-        setParticipantData(prev => ({
-          ...prev,
-          [event.id]: {
-            count: 0,
-            participants: [],
-            loading: false
-          }
-        }));
-      }
-    });  }, [events]);
+  // Second useEffect removed: batch endpoint handles all previews in one call
 
   // Handle image loading completion
   const handleImageLoad = useCallback((eventId: string) => {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(
   _: Request,
@@ -41,9 +42,15 @@ export async function GET(
     }
 
     if (error || !data) {
-      return NextResponse.json({ event: null }, { status: 404 });
+      return NextResponse.json(
+        { event: null },
+        { status: 404, headers: { "Cache-Control": "s-maxage=30" } }
+      );
     }
-    return NextResponse.json({ event: data });
+    return NextResponse.json(
+      { event: data },
+      { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" } }
+    );
   } catch (error) {
     console.error("Error fetching event:", error);
     return NextResponse.json({ error: "Failed to fetch event" }, { status: 500 });
@@ -58,16 +65,10 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     
-    const supabase = await createClient();
-
-    // Check if user is admin using getUser instead of getSession
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    
-    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
+  const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === null;
     
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
@@ -124,16 +125,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    
-    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
+  const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === null;
     
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });

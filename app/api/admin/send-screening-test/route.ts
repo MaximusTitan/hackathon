@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function POST(request: Request) {
   try {
@@ -12,13 +12,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Check if user is admin
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
     
     const isAdmin = session.user.user_metadata?.role === 'admin' || 
                      session.user.user_metadata?.role === null;
@@ -114,25 +110,21 @@ export async function POST(request: Request) {
     if (regError) {
       console.error('Error fetching registrations for workflow:', regError);
     } else if (registrations && registrations.length > 0) {
-      // Create or update workflow entries for each registration
-      for (const reg of registrations) {
-        try {
-          await supabase
-            .from('user_event_workflow')
-            .upsert({
-              registration_id: reg.id,
-              user_id: reg.user_id,
-              event_id,
-              screening_test_id: screeningTestId
-            }, {
-              onConflict: 'user_id,event_id',
-              ignoreDuplicates: false
-            });
-        } catch (workflowError) {
-          console.error(`Error creating workflow entry for user ${reg.user_id}:`, workflowError);
-          // Continue with other users even if one fails
-        }
-      }
+      const upserts = registrations.map((reg) =>
+        supabase
+          .from('user_event_workflow')
+          .upsert({
+            registration_id: reg.id,
+            user_id: reg.user_id,
+            event_id,
+            screening_test_id: screeningTestId
+          }, {
+            onConflict: 'user_id,event_id',
+            ignoreDuplicates: false
+          })
+          .then(({ error }) => { if (error) console.error(`Error creating workflow entry for user ${reg.user_id}:`, error); })
+      );
+      await Promise.allSettled(upserts);
     }
 
     return NextResponse.json({ 

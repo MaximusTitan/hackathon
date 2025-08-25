@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function PATCH(
   request: Request,
@@ -9,16 +10,11 @@ export async function PATCH(
     const { attended } = await request.json();
     const { id: registrationId } = await params;
 
-    const supabase = await createClient();
-    
-    // Check if user is admin
-    const { data: { session } } = await supabase.auth.getSession();
+    const { supabase, session } = (await getSupabaseAndSession()) as any;
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    const isAdmin = session.user.user_metadata?.role === 'admin' || 
-                     session.user.user_metadata?.role === null;
+    const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === null;
                      
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });

@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    
-    // Get current user's session
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const result = await getSupabaseAndSession();
+    if (!result.ok) return result.res;
+    const { supabase, session } = result;
 
     // Fetch user's registrations with event details
     const { data, error } = await supabase
@@ -37,7 +33,7 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ registrations: data });
+  return NextResponse.json({ registrations: data });
   } catch (error) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }

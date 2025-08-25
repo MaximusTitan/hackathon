@@ -18,7 +18,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .eq("event_id", eventId);
 
   if (countError) {
-    return NextResponse.json({ error: countError.message }, { status: 500 });
+    return NextResponse.json(
+      { error: countError.message },
+      { status: 500, headers: { "Cache-Control": "s-maxage=30" } }
+    );
   }
 
   // Get paginated participants
@@ -36,7 +39,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .range(offset, offset + limit - 1);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500, headers: { "Cache-Control": "s-maxage=30" } }
+    );
   }
 
   // Fetch profile photos for all participants
@@ -71,15 +77,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       photo_url: photoMap[p.user_id] || null,
     })) || [];
 
-  return NextResponse.json({ 
-    participants: participantsWithPhoto,
-    pagination: {
-      page,
-      limit,
-      total: count || 0,
-      totalPages: Math.ceil((count || 0) / limit),
-      hasNext: offset + limit < (count || 0),
-      hasPrev: page > 1
-    }
-  });
+  return NextResponse.json(
+    { 
+      participants: participantsWithPhoto,
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+        hasNext: offset + limit < (count || 0),
+        hasPrev: page > 1
+      }
+    },
+    { headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=300" } }
+  );
 }

@@ -1,18 +1,14 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    
-    // Check if user is authenticated and is admin
-    const { data: { session } } = await supabase.auth.getSession();
+    const { supabase, session } = (await getSupabaseAndSession()) as any;
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    
-    const isAdmin = session.user.user_metadata?.role === 'admin' || 
-                     session.user.user_metadata?.role === null;
+    const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === null;
                      
     if (!isAdmin) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });

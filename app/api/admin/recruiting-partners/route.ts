@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 // GET - Fetch recruiting partners for a specific event
 export async function GET(request: Request) {
@@ -43,17 +44,10 @@ export async function GET(request: Request) {
 // POST - Add new recruiting partner for an event
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-
-    // Check if user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    
-    const isAdmin = user.user_metadata?.role === 'admin' || user.user_metadata?.role === null;
-    
+    const result = await getSupabaseAndSession();
+    if (!result.ok) return result.res;
+    const { supabase, session } = result;
+    const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.user_metadata?.role === null;
     if (!isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }

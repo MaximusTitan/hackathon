@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(request: Request) {
   try {
@@ -17,13 +17,9 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Check if user is admin
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
     
     const isAdmin = session.user.user_metadata?.role === 'admin' || 
                      session.user.user_metadata?.role === null;
@@ -150,8 +146,7 @@ export async function GET(request: Request) {
     let adminProfiles: any[] = [];
 
     if (registrationIds.length > 0) {
-      // Fetch test attempts
-      const { data: testAttemptsData } = await supabase
+      const testAttemptsPromise = supabase
         .from('user_test_attempts')
         .select(`
           id,
@@ -168,41 +163,43 @@ export async function GET(request: Request) {
         `)
         .in('registration_id', registrationIds);
 
-      testAttempts = testAttemptsData || [];
+      const screeningTestIds = Array.from(new Set(data.map((reg: any) => reg.screening_test_id).filter(Boolean)));
+      const screeningTestsPromise = screeningTestIds.length > 0
+        ? supabase
+            .from('screening_tests')
+            .select(`
+              id,
+              title,
+              passing_score,
+              timer_minutes,
+              total_questions,
+              mcq_link,
+              deadline
+            `)
+            .in('id', screeningTestIds)
+        : Promise.resolve({ data: [] as any[] });
 
-      // Get screening test details
-      const screeningTestIds = Array.from(new Set(data.map(reg => reg.screening_test_id).filter(Boolean)));
-      if (screeningTestIds.length > 0) {
-        const { data: screeningTestsData } = await supabase
-          .from('screening_tests')
-          .select(`
-            id,
-            title,
-            passing_score,
-            timer_minutes,
-            total_questions,
-            mcq_link,
-            deadline
-          `)
-          .in('id', screeningTestIds);
+      const awardAssignedByIds = Array.from(new Set(data.map((reg: any) => reg.award_assigned_by).filter(Boolean)));
+      const adminProfilesPromise = awardAssignedByIds.length > 0
+        ? supabase
+            .from('admin_profiles')
+            .select(`
+              id,
+              name,
+              email
+            `)
+            .in('id', awardAssignedByIds)
+        : Promise.resolve({ data: [] as any[] });
 
-        screeningTests = screeningTestsData || [];
-      }
+      const [testAttemptsRes, screeningTestsRes, adminProfilesRes] = await Promise.all([
+        testAttemptsPromise,
+        screeningTestsPromise,
+        adminProfilesPromise,
+      ]);
 
-      // Get admin profiles for award assignees
-      const awardAssignedByIds = Array.from(new Set(data.map(reg => reg.award_assigned_by).filter(Boolean)));
-      if (awardAssignedByIds.length > 0) {
-        const { data: adminProfilesData } = await supabase
-          .from('admin_profiles')
-          .select(`
-            id,
-            name,
-            email
-          `)
-          .in('id', awardAssignedByIds);
-
-        adminProfiles = adminProfilesData || [];
-      }
+      testAttempts = (testAttemptsRes as any).data || [];
+      screeningTests = (screeningTestsRes as any).data || [];
+      adminProfiles = (adminProfilesRes as any).data || [];
     }
 
     // Create lookup maps

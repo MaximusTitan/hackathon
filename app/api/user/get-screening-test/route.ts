@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
 
 export async function GET(request: Request) {
   try {
@@ -13,13 +13,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    
-    // Check if user is authenticated
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }    // Get user's registration and associated screening test
+  const result = await getSupabaseAndSession();
+  if (!result.ok) return result.res;
+  const { supabase, session } = result;
+  // Get user's registration and associated screening test
     // First get the registration
     const { data: registration, error: regError } = await supabase
       .from('registrations')
