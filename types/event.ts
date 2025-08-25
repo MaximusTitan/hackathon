@@ -7,6 +7,7 @@ export type Event = {
   start_time?: string | null;
   end_time?: string | null;
   event_type: "virtual" | "offline" | null;
+  event_category?: "hackathon" | "sales" | null;
   meeting_link?: string | null;
   location?: string | null;
   location_link?: string | null;
@@ -67,6 +68,8 @@ export interface EventRegistration {
   deployment_link?: string | null;
   presentation_link?: string | null;
   presentation_notes?: string | null;
+  video_link?: string | null;
+  sales_presentation_link?: string | null;
   award_type?: 'winner' | 'runner_up' | null;
   award_assigned_at?: string | null;
   admin_notes?: string | null;

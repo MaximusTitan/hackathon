@@ -677,6 +677,7 @@ export default function EventRegistrationsPage() {
                   sortOrder={sortOrder}
                   currentPage={currentPage}
                   itemsPerPage={itemsPerPage}
+                  eventCategory={(event as any)?.event_category || "hackathon"}
                   onSort={(column: string) => {
                     if (sortBy === column) {
                       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');

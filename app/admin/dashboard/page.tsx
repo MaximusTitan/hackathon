@@ -49,6 +49,7 @@ export default function AdminDashboard() {
     start_time: "",
     end_time: "",
     event_type: "offline" as "virtual" | "offline",
+    event_category: "hackathon" as "hackathon" | "sales",
     meeting_link: "",
     location: "",
     location_link: "",
@@ -249,11 +250,16 @@ export default function AdminDashboard() {
         razorpay_key_id: form.is_paid ? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "" : null,
       };
 
-      await fetch("/api/events", {
+      const response = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(eventData),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
       
       // Reset form and state
       resetForm();
@@ -263,7 +269,7 @@ export default function AdminDashboard() {
 
     } catch (error) {
       console.error("Error creating event:", error);
-      toast.error("Failed to create event");
+      toast.error(`Failed to create event: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setCreating(false);
       setUploading(false);
@@ -398,6 +404,7 @@ export default function AdminDashboard() {
       start_time: event.start_time || "",
       end_time: event.end_time || "",
       event_type: event.event_type || "offline",
+      event_category: (event as any).event_category || "hackathon",
       meeting_link: event.meeting_link || "",
       location: event.location || "",
       location_link: event.location_link || "",
@@ -431,6 +438,7 @@ export default function AdminDashboard() {
       start_time: "",
       end_time: "",
       event_type: "offline",
+      event_category: "hackathon",
       meeting_link: "",
       location: "",
       location_link: "",

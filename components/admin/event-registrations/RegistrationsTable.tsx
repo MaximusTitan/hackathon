@@ -32,6 +32,7 @@ interface RegistrationsTableProps {
   sortOrder: 'asc' | 'desc';
   currentPage?: number;
   itemsPerPage?: number;
+  eventCategory?: "hackathon" | "sales";
   onSort: (column: string) => void;
   onUpdateAttendance: (registrationId: string, attended: boolean) => void;
   onUpdateQualification: (registrationId: string, status: 'qualified' | 'rejected' | 'pending') => void;
@@ -52,6 +53,7 @@ export function RegistrationsTable({
   sortOrder,
   currentPage = 1,
   itemsPerPage = 25,
+  eventCategory = "hackathon",
   onSort,
   onUpdateAttendance,
   onUpdateQualification,
@@ -152,7 +154,9 @@ export function RegistrationsTable({
                   Test Score {getSortIcon('test_score')}
                 </div>
               </TableHead>
-              <TableHead className="min-w-[120px]">Project Status</TableHead>
+              <TableHead className="min-w-[120px]">
+                {eventCategory === "sales" ? "Sales Presentation Status" : "Project Status"}
+              </TableHead>
               <TableHead className="min-w-[120px]">Qualification Status</TableHead>
               <TableHead className="min-w-[100px]">Award Status</TableHead>
               <TableHead className="min-w-[150px]">Admin Notes</TableHead>
@@ -164,7 +168,9 @@ export function RegistrationsTable({
                   Admin Score {getSortIcon('admin_score')}
                 </div>
               </TableHead>
-              <TableHead className="min-w-[120px]">Project Links</TableHead>
+              <TableHead className="min-w-[120px]">
+                {eventCategory === "sales" ? "Sales Links" : "Project Links"}
+              </TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -384,43 +390,77 @@ export function RegistrationsTable({
                   </div>
                 </TableCell>
                 <TableCell>
-                  {reg.github_link || reg.deployment_link || reg.presentation_link ? (
+                  {(eventCategory === "sales" && (reg.video_link || reg.sales_presentation_link)) || 
+                   (eventCategory === "hackathon" && (reg.github_link || reg.deployment_link || reg.presentation_link)) ? (
                     <div className="space-y-1">
-                      {reg.github_link && (
-                        <div>
-                          <a
-                            href={reg.github_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline text-sm flex items-center gap-1"
-                          >
-                            GitHub <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      )}
-                      {reg.deployment_link && (
-                        <div>
-                          <a
-                            href={reg.deployment_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-green-600 hover:underline text-sm flex items-center gap-1"
-                          >
-                            Live Demo <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                      )}
-                      {reg.presentation_link && (
-                        <div>
-                          <a
-                            href={reg.presentation_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-600 hover:underline text-sm flex items-center gap-1"
-                          >
-                            Presentation <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
+                      {eventCategory === "sales" ? (
+                        // Sales event links
+                        <>
+                          {reg.video_link && (
+                            <div>
+                              <a
+                                href={reg.video_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-red-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                Sales Video <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                          {reg.sales_presentation_link && (
+                            <div>
+                              <a
+                                href={reg.sales_presentation_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                Sales Materials <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        // Hackathon event links
+                        <>
+                          {reg.github_link && (
+                            <div>
+                              <a
+                                href={reg.github_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                GitHub <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                          {reg.deployment_link && (
+                            <div>
+                              <a
+                                href={reg.deployment_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                Live Demo <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                          {reg.presentation_link && (
+                            <div>
+                              <a
+                                href={reg.presentation_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 hover:underline text-sm flex items-center gap-1"
+                              >
+                                Presentation <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+                        </>
                       )}
                       {reg.presentation_notes && (
                         <div className="text-xs text-gray-600">

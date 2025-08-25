@@ -40,6 +40,7 @@ type Event = {
   start_time: string;
   end_time: string;
   event_type: "virtual" | "offline";
+  event_category?: "hackathon" | "sales";
   meeting_link?: string | null;
   location?: string | null;
   location_link?: string | null;
@@ -67,6 +68,7 @@ interface AdminEventFormProps {
     start_time: string;
     end_time: string;
     event_type: "virtual" | "offline";
+    event_category: "hackathon" | "sales";
     meeting_link: string;
     location: string;
     location_link: string;
@@ -403,7 +405,32 @@ export function AdminEventForm({
                   <SelectItem value="offline">Offline</SelectItem>
                   <SelectItem value="virtual">Virtual</SelectItem>
                 </SelectContent>
-              </Select>            </div>
+              </Select>
+            </div>
+
+            {/* Event Category */}
+            <div className="grid gap-2">
+              <Label htmlFor="event_category" className="text-gray-700">
+                Event Category
+              </Label>
+              <Select
+                value={form.event_category}
+                onValueChange={(value) => setForm((f: any) => ({ ...f, event_category: value as "hackathon" | "sales" }))}
+              >
+                <SelectTrigger className="bg-white border-gray-200 text-gray-900">
+                  <SelectValue placeholder="Select event category" />
+                </SelectTrigger>
+                <SelectContent className="bg-white text-gray-900">
+                  <SelectItem value="hackathon">Hackathon</SelectItem>
+                  <SelectItem value="sales">Sales Event</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-gray-500 text-xs">
+                {form.event_category === "hackathon" 
+                  ? "Participants will submit GitHub repos, deployment links, and presentations" 
+                  : "Participants will submit video presentations and sales pitch materials"}
+              </p>
+            </div>
 
             {/* Venue TBA Toggle - Only show for offline events */}
             {form.event_type === "offline" && (
@@ -558,12 +585,16 @@ export function AdminEventForm({
             {/* Project Instructions */}
             <div className="grid gap-2">
               <Label htmlFor="project_instructions" className="text-gray-700">
-                Project Instructions
+                {form.event_category === "sales" ? "Sales Challenge Instructions" : "Project Instructions"}
               </Label>
               <TiptapEditor
                 content={form.project_instructions || ""}
                 onChange={(content) => setForm((f: any) => ({ ...f, project_instructions: content }))}
-                placeholder="Enter project instructions for participants who pass the screening test..."
+                placeholder={
+                  form.event_category === "sales" 
+                    ? "Enter instructions for the sales challenge, submission guidelines, and evaluation criteria..."
+                    : "Enter project instructions for participants who pass the screening test..."
+                }
                 toolbar={{
                   bold: true,
                   italic: true,
@@ -581,7 +612,9 @@ export function AdminEventForm({
                 }}
               />
               <p className="text-gray-500 text-xs">
-                These instructions will be shown to participants after they pass the screening test or if screening is skipped.
+                {form.event_category === "sales" 
+                  ? "These instructions will guide participants on how to create and submit their sales presentations and videos."
+                  : "These instructions will be shown to participants after they pass the screening test or if screening is skipped."}
               </p>
             </div>
 

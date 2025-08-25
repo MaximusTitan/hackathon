@@ -12,6 +12,7 @@ type Event = {
   start_time: string;
   end_time: string;
   event_type: "virtual" | "offline";
+  event_category?: "hackathon" | "sales";
   meeting_link?: string | null;
   location?: string | null;
   location_link?: string | null;

@@ -16,7 +16,7 @@ export async function GET(
     const [eventRes, regRes] = await Promise.all([
       supabase
         .from('events')
-        .select('id, title, project_instructions, show_start_button')
+        .select('id, title, project_instructions, show_start_button, event_category')
         .eq('id', eventId)
         .single(),
       supabase
@@ -30,7 +30,9 @@ export async function GET(
           github_link,
           deployment_link,
           presentation_link,
-          presentation_notes
+          presentation_notes,
+          video_link,
+          sales_presentation_link
         `)
         .eq('event_id', eventId)
         .eq('user_id', session.user.id)

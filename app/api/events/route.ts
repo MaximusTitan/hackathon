@@ -91,6 +91,7 @@ export async function POST(request: Request) {
       is_paid: eventData.is_paid || false,
       price: eventData.price || 0,
       razorpay_key_id: eventData.razorpay_key_id || null,
+      event_category: eventData.event_category || 'hackathon',
       
       // Handle TBA fields - set to NULL if TBA is true or if value is empty string
       start_date: eventData.date_tba || !eventData.start_date ? null : eventData.start_date,

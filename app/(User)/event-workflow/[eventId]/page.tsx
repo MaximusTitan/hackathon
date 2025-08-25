@@ -26,6 +26,7 @@ type WorkflowData = {
     title: string;
     project_instructions?: string | null;
     show_start_button?: boolean;
+    event_category?: "hackathon" | "sales" | null;
   };
   registration: {
     id: string;
@@ -36,6 +37,8 @@ type WorkflowData = {
     deployment_link?: string | null;
     presentation_link?: string | null;
     presentation_notes?: string | null;
+    video_link?: string | null;
+    sales_presentation_link?: string | null;
   };
   screening_test?: {
     id: string;
@@ -61,7 +64,9 @@ export default function EventWorkflowPage() {
     github_link: '',
     deployment_link: '',
     presentation_link: '',
-    presentation_notes: ''
+    presentation_notes: '',
+    video_link: '',
+    sales_presentation_link: ''
   });
   
   // MCQ Test states
@@ -96,7 +101,9 @@ export default function EventWorkflowPage() {
               github_link: data.registration.github_link || '',
               deployment_link: data.registration.deployment_link || '',
               presentation_link: data.registration.presentation_link || '',
-              presentation_notes: data.registration.presentation_notes || ''
+              presentation_notes: data.registration.presentation_notes || '',
+              video_link: data.registration.video_link || '',
+              sales_presentation_link: data.registration.sales_presentation_link || ''
             });
           }
         } else {
@@ -151,12 +158,13 @@ export default function EventWorkflowPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           event_id: eventId,
+          event_category: workflowData?.event.event_category || 'hackathon',
           ...presentationForm
         })
       });
 
       if (res.ok) {
-        toast.success('Presentation submitted successfully');
+        toast.success('Submission completed successfully');
         // Refresh workflow data
         const refreshRes = await fetch(`/api/user/event-workflow/${eventId}`);
         if (refreshRes.ok) {
@@ -531,7 +539,9 @@ export default function EventWorkflowPage() {
               <div className="flex items-center gap-3">
                 {getStatusIcon(registration.presentation_status)}
                 <div>
-                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardTitle>
+                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
+                  </CardTitle>
                   <CardDescription>
                     Status: {registration.presentation_status.charAt(0).toUpperCase() + registration.presentation_status.slice(1)}
                   </CardDescription>
@@ -540,54 +550,109 @@ export default function EventWorkflowPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePresentationSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="github_link">GitHub Repository Link *</Label>
-                  <Input
-                    id="github_link"
-                    type="url"
-                    value={presentationForm.github_link}
-                    onChange={(e) => setPresentationForm(prev => ({ ...prev, github_link: e.target.value }))}
-                    placeholder="https://github.com/username/repository"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="deployment_link">Deployed Application Link *</Label>
-                  <Input
-                    id="deployment_link"
-                    type="url"
-                    value={presentationForm.deployment_link}
-                    onChange={(e) => setPresentationForm(prev => ({ ...prev, deployment_link: e.target.value }))}
-                    placeholder="https://your-app.vercel.app"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="presentation_link">Documentation/Presentation Link *</Label>
-                  <Input
-                    id="presentation_link"
-                    type="url"
-                    value={presentationForm.presentation_link}
-                    onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_link: e.target.value }))}
-                    placeholder="https://docs.google.com/presentation/... or https://canva.com/..."
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="presentation_notes">Additional Notes</Label>
-                  <Textarea
-                    id="presentation_notes"
-                    value={presentationForm.presentation_notes}
-                    onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_notes: e.target.value }))}
-                    placeholder="Any additional information about your project..."
-                    rows={4}
-                  />
-                </div>                <Button 
+                {/* Conditional form fields based on event category */}
+                {event.event_category === "sales" ? (
+                  // Sales Event Form
+                  <>
+                    <div>
+                      <Label htmlFor="video_link">Sales Pitch Video Link *</Label>
+                      <Input
+                        id="video_link"
+                        type="url"
+                        value={presentationForm.video_link}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, video_link: e.target.value }))}
+                        placeholder="https://www.youtube.com/watch?v=... or https://drive.google.com/..."
+                        required
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        Upload your sales pitch video to YouTube, Google Drive, or any video platform and share the link
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="sales_presentation_link">Sales Presentation/Materials Link *</Label>
+                      <Input
+                        id="sales_presentation_link"
+                        type="url"
+                        value={presentationForm.sales_presentation_link}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, sales_presentation_link: e.target.value }))}
+                        placeholder="https://docs.google.com/presentation/... or https://canva.com/..."
+                        required
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        Share your sales presentation, pitch deck, or supporting materials
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="presentation_notes">Additional Notes</Label>
+                      <Textarea
+                        id="presentation_notes"
+                        value={presentationForm.presentation_notes}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_notes: e.target.value }))}
+                        placeholder="Any additional information about your sales approach, target audience, strategy, etc..."
+                        rows={4}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  // Hackathon Event Form (Default)
+                  <>
+                    <div>
+                      <Label htmlFor="github_link">GitHub Repository Link *</Label>
+                      <Input
+                        id="github_link"
+                        type="url"
+                        value={presentationForm.github_link}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, github_link: e.target.value }))}
+                        placeholder="https://github.com/username/repository"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="deployment_link">Deployed Application Link</Label>
+                      <Input
+                        id="deployment_link"
+                        type="url"
+                        value={presentationForm.deployment_link}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, deployment_link: e.target.value }))}
+                        placeholder="https://your-app.vercel.app"
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        Optional: Share your live application if deployed
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="presentation_link">Documentation/Presentation Link</Label>
+                      <Input
+                        id="presentation_link"
+                        type="url"
+                        value={presentationForm.presentation_link}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_link: e.target.value }))}
+                        placeholder="https://docs.google.com/presentation/... or https://canva.com/..."
+                      />
+                      <p className="text-sm text-gray-600 mt-1">
+                        Optional: Share your project presentation or documentation
+                      </p>
+                    </div>
+                    <div>
+                      <Label htmlFor="presentation_notes">Additional Notes</Label>
+                      <Textarea
+                        id="presentation_notes"
+                        value={presentationForm.presentation_notes}
+                        onChange={(e) => setPresentationForm(prev => ({ ...prev, presentation_notes: e.target.value }))}
+                        placeholder="Any additional information about your project..."
+                        rows={4}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <Button 
                   type="submit" 
                   disabled={submitting}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
-                  {submitting ? 'Submitting...' : registration.presentation_status === 'submitted' ? 'Update Submission' : 'Submit Project'}
+                  {submitting ? 'Submitting...' : registration.presentation_status === 'submitted' ? 'Update Submission' : 
+                    event.event_category === "sales" ? 'Submit Sales Presentation' : 'Submit Project'}
                 </Button>
               </form>
             </CardContent>
@@ -601,7 +666,9 @@ export default function EventWorkflowPage() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-orange-600" />
                 <div>
-                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardTitle>
+                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
+                  </CardTitle>
                   <CardDescription>
                     Temporarily Disabled
                   </CardDescription>
@@ -610,10 +677,14 @@ export default function EventWorkflowPage() {
             </CardHeader>
             <CardContent>
               <div className="text-orange-700 bg-orange-50 p-4 rounded-lg">
-                <p className="font-semibold">⏸️ Project Submission Disabled</p>
+                <p className="font-semibold">
+                  ⏸️ {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"} Disabled
+                </p>
                 <p className="mt-2">
-                  Project submission has been temporarily disabled by the admin. 
-                  Please check back later or contact the admin for more information.
+                  {event.event_category === "sales" 
+                    ? "Sales presentation submission has been temporarily disabled by the admin."
+                    : "Project submission has been temporarily disabled by the admin."
+                  } Please check back later or contact the admin for more information.
                 </p>
               </div>
             </CardContent>
@@ -627,7 +698,9 @@ export default function EventWorkflowPage() {
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600" />
                 <div>
-                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardTitle>
+                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
+                  </CardTitle>
                   <CardDescription>
                     Access Restricted
                   </CardDescription>
@@ -638,7 +711,7 @@ export default function EventWorkflowPage() {
               <div className="text-red-700 bg-red-50 p-4 rounded-lg">
                 <p className="font-semibold">❌ Screening Test Required</p>
                 <p className="mt-2">
-                  You need to pass the screening test to access project submission. 
+                  You need to pass the screening test to access {event.event_category === "sales" ? "sales presentation submission" : "project submission"}. 
                   Your current score is below the required passing percentage.
                 </p>
                 {workflowData.test_result && (                  <p className="mt-2 text-sm">
@@ -658,7 +731,9 @@ export default function EventWorkflowPage() {
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-gray-500" />
                 <div>
-                  <CardTitle>Step 2: Project Submission</CardTitle>
+                  <CardTitle>
+                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
+                  </CardTitle>
                   <CardDescription>
                     Waiting for Admin
                   </CardDescription>
@@ -667,9 +742,11 @@ export default function EventWorkflowPage() {
             </CardHeader>
             <CardContent>
               <div className="text-gray-700 bg-gray-50 p-4 rounded-lg">
-                <p className="font-semibold">⏳ Project submission will be available after screening test assignment</p>
+                <p className="font-semibold">
+                  ⏳ {event.event_category === "sales" ? "Sales presentation submission" : "Project submission"} will be available after screening test assignment
+                </p>
                 <p className="mt-2">
-                  The admin needs to assign and configure the screening test before project submission becomes available.
+                  The admin needs to assign and configure the screening test before {event.event_category === "sales" ? "sales presentation submission" : "project submission"} becomes available.
                   Please check back later or contact the admin for more information.
                 </p>
               </div>

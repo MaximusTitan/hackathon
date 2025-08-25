@@ -8,8 +8,9 @@ type Props = {
 };
 
 async function getEvent(eventParam: string) {
-  const cookieStore = cookies();
-  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+  // Next.js v15 requires awaiting cookies() when consuming its values.
+  // createServerComponentClient accepts the cookies function directly and handles it.
+  const supabase = createServerComponentClient({ cookies });
   
   try {
     // Check if it's a UUID or title slug
