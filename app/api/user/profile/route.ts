@@ -40,7 +40,8 @@ export async function PUT(request: Request) {
     role: updates.role,
     updated_at: new Date().toISOString(),
   };
-  if (typeof updates.photo_url === "string" && updates.photo_url.length > 0) {
+  // Allow explicitly setting photo_url to a string or null to clear it
+  if (Object.prototype.hasOwnProperty.call(updates, 'photo_url')) {
     updateData.photo_url = updates.photo_url;
   }
 
@@ -54,9 +55,11 @@ export async function PUT(request: Request) {
   }
 
   // Also update auth metadata
-  await supabase.auth.updateUser({
-    data: { name: updates.name }
-  });
+  if (typeof updates.name === 'string') {
+    await supabase.auth.updateUser({
+      data: { name: updates.name }
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

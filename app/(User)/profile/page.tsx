@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Pencil, Save, X, UploadCloud } from "lucide-react";
+import { Pencil, Save, X, UploadCloud, Trash2 } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Image from "next/image";
 
@@ -32,6 +32,10 @@ export default function UserProfile() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Profile>>({});
   const [uploading, setUploading] = useState(false);
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [selectedPhotoPreview, setSelectedPhotoPreview] = useState<string | null>(null);
+  const [removeExistingPhoto, setRemoveExistingPhoto] = useState(false);
+  const [removedPhotoUrl, setRemovedPhotoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClientComponentClient();
 
@@ -48,51 +52,103 @@ export default function UserProfile() {
     fetchProfile();
   }, []);
 
-  // Handle profile photo upload
+  // Handle profile photo selection (save in state; upload on Save)
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
-    setUploading(true);
-    try {
-      const fileExt = file.name.split(".").pop();
-      const filePath = `profile-photos/${profile.id}.${fileExt}`;
-      // Upload to Supabase Storage (bucket: "profile-photos")
-      const { error: uploadError } = await supabase.storage
-        .from("profile-photos")
-        .upload(filePath, file, { upsert: true });
-      if (uploadError) {
-        toast.error("Failed to upload photo");
-        setUploading(false);
-        return;
-      }
-      // Get public URL
-      const { data } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
-      if (data?.publicUrl) {
-        setFormData((prev) => ({ ...prev, photo_url: data.publicUrl }));
-        setProfile((prev) => (prev ? { ...prev, photo_url: data.publicUrl } : prev));
-        toast.success("Profile photo updated");
-      }
-    } catch (err) {
-      toast.error("Photo upload failed");
+    if (!file) return;
+    setSelectedPhotoFile(file);
+    setSelectedPhotoPreview(URL.createObjectURL(file));
+    // User picked a new image; cancel any pending removal of existing photo
+    setRemoveExistingPhoto(false);
+    setRemovedPhotoUrl(null);
+  };
+
+  const handleRemovePhoto = () => {
+    if (selectedPhotoPreview) {
+      // Just clear the newly selected file
+      setSelectedPhotoFile(null);
+      setSelectedPhotoPreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
-    setUploading(false);
+    const existingUrl = (formData.photo_url || profile?.photo_url || null) as string | null;
+    if (existingUrl) {
+      setRemovedPhotoUrl(existingUrl);
+      setRemoveExistingPhoto(true);
+      // Hide immediately in UI
+      setFormData((prev) => ({ ...prev, photo_url: null }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  toast('Profile photo will be removed on save');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
     try {
-      const res = await fetch("/api/user/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      if (res.ok) {
-        setProfile({ ...profile, ...formData } as Profile);
-        setEditing(false);
-        toast.success("Profile updated successfully");
+      const payload: Partial<Profile> = { ...formData };
+
+      // If marked for removal, delete from storage (best effort) and clear field
+      if (removeExistingPhoto && removedPhotoUrl) {
+        try {
+          const delRes = await fetch('/api/user/delete-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicUrl: removedPhotoUrl }),
+          });
+          if (!delRes.ok) {
+            const d = await delRes.json().catch(() => ({}));
+            console.warn('Photo delete warning:', d.error || delRes.statusText);
+          }
+        } catch (err) {
+          console.warn('Photo delete failed:', err);
+        }
+        payload.photo_url = null;
       }
-    } catch (error) {
-      toast.error("Failed to update profile");
+
+      // If a new photo is selected (and not removing existing), upload it then save the URL
+      if (!removeExistingPhoto && selectedPhotoFile) {
+        const form = new FormData();
+        form.append('image', selectedPhotoFile);
+        form.append('folder', 'profile-photos');
+
+        const resUpload = await fetch('/api/user/upload-image', {
+          method: 'POST',
+          body: form,
+        });
+        if (!resUpload.ok) {
+          const data = await resUpload.json().catch(() => ({}));
+          throw new Error(data.error || `Photo upload failed (${resUpload.status})`);
+        }
+        const { publicUrl } = await resUpload.json();
+        if (!publicUrl) throw new Error('No publicUrl returned');
+        payload.photo_url = publicUrl;
+      }
+
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      const updated = { ...profile, ...payload } as Profile;
+      setProfile(updated);
+      setFormData(updated);
+      setEditing(false);
+      // Clear local selection after successful save
+      setSelectedPhotoFile(null);
+      setSelectedPhotoPreview(null);
+  setRemoveExistingPhoto(false);
+  setRemovedPhotoUrl(null);
+      toast.success('Profile updated successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update profile');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -122,6 +178,10 @@ export default function UserProfile() {
                 onClick={() => {
                   setEditing(false);
                   setFormData(profile || {});
+                  setSelectedPhotoFile(null);
+                  setSelectedPhotoPreview(null);
+                  setRemoveExistingPhoto(false);
+                  setRemovedPhotoUrl(null);
                 }}
                 className="flex items-center gap-2"
               >
@@ -145,13 +205,14 @@ export default function UserProfile() {
           <div className="flex items-center gap-6">
             <div className="relative">
               <div className="h-24 w-24 rounded-full bg-rose-100 flex items-center justify-center overflow-hidden border-4 border-white shadow-xl">
-                {profile?.photo_url ? (
+        {selectedPhotoPreview || (!removeExistingPhoto && (formData.photo_url || profile?.photo_url)) ? (
                   <Image
-                    src={formData.photo_url || profile.photo_url}
+          src={(selectedPhotoPreview || formData.photo_url || profile?.photo_url || "") as string}
                     alt="Profile"
                     width={96}
                     height={96}
                     className="h-full w-full object-cover"
+                    unoptimized={!!selectedPhotoPreview}
                   />
                 ) : (
                   <span className="text-3xl font-bold text-rose-600">
@@ -168,6 +229,17 @@ export default function UserProfile() {
                     ref={fileInputRef}
                     onChange={handlePhotoChange}
                   />
+                  {(selectedPhotoPreview || (!removeExistingPhoto && (formData.photo_url || profile?.photo_url))) && (
+                    <button
+                      type="button"
+                      title="Remove photo"
+                      className="absolute -top-2 -right-2 rounded-full p-2 bg-red-600 hover:bg-red-700 text-white shadow ring-2 ring-white"
+                      onClick={handleRemovePhoto}
+                      disabled={uploading}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 border border-gray-200"
