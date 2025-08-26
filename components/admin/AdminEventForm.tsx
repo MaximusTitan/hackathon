@@ -197,6 +197,15 @@ export function AdminEventForm({
     }
   };
 
+  // Clear/remove currently selected image (file or URL)
+  const handleRemoveImage = useCallback(() => {
+    setImageFile(null);
+    setImagePreview(null);
+    setForm((f: any) => ({ ...f, image_url: "" }));
+    const fileInput = document.getElementById('image') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  }, [setForm, setImageFile, setImagePreview]);
+
   return (
     <Card className="mb-8 bg-white">
       <CardHeader>
@@ -631,18 +640,31 @@ export function AdminEventForm({
                     accept="image/*"
                     onChange={handleImageChange}
                     className="border-gray-200"
-                    disabled={!!form.image_url}
+                    disabled={uploading || !!form.image_url}
                   />
-                  {imagePreview && (
+                  {uploading && (
+                    <p className="text-sm text-gray-500">Uploading image…</p>
+                  )}
+                  {(imagePreview || form.image_url) && (
                     <div className="mt-2">
-                      <Image
-                        src={imagePreview}
-                        alt="Preview"
-                        width={400}
-                        height={300}
-                        className="w-full max-w-md rounded-lg object-cover"
-                        unoptimized={imagePreview.startsWith('data:')}
-                      />
+                      <div className="relative w-full max-w-md">
+                        <Image
+                          src={imagePreview || form.image_url}
+                          alt="Selected image preview"
+                          width={400}
+                          height={300}
+                          className="w-full rounded-lg object-cover border border-gray-200"
+                          // Use unoptimized for blob/data URLs or external preview safety
+                          unoptimized={
+                            !!imagePreview || (!!form.image_url && (form.image_url.startsWith('blob:') || form.image_url.startsWith('data:')))
+                          }
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <Button type="button" variant="secondary" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={handleRemoveImage}>
+                            Remove image
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -658,8 +680,15 @@ export function AdminEventForm({
                   value={form.image_url}
                   onChange={handleImageUrlChange}
                   className="border-gray-200"
-                  disabled={!!imageFile}
+                  disabled={uploading || !!imageFile}
                 />
+                {form.image_url && (
+                  <div>
+                    <Button type="button" variant="secondary" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={handleRemoveImage}>
+                      Clear URL
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 

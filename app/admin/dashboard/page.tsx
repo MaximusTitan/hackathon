@@ -209,23 +209,22 @@ export default function AdminDashboard() {
   };
 
   const uploadImage = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', 'event-images');
 
-    const { error: uploadError } = await supabase.storage
-      .from('event-images')
-      .upload(filePath, file);
+    const res = await fetch('/api/events/upload-image', {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (uploadError) {
-      throw uploadError;
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Upload failed with status ${res.status}`);
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('event-images')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+    const data = await res.json();
+    if (!data.publicUrl) throw new Error('No publicUrl returned');
+    return data.publicUrl as string;
   };
 
   async function handleCreateEvent(e: React.FormEvent) {

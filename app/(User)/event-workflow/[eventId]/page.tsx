@@ -315,7 +315,8 @@ export default function EventWorkflowPage() {
           }
         }
         return 'Completed';      case 'skipped':
-        return '⏭️ Skipped by admin - proceed to next step';
+  // Do not reveal that it was skipped; present as ready/complete
+  return 'Ready to proceed to the next step';
       default:
         return String(registration.screening_status).charAt(0).toUpperCase() + String(registration.screening_status).slice(1);
     }
@@ -332,7 +333,8 @@ export default function EventWorkflowPage() {
         }
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'skipped':
-        return <CheckCircle className="w-5 h-5 text-orange-600" />;
+  // Treat as a success without calling out the skip
+  return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'sent':
         return <Clock className="w-5 h-5 text-blue-600" />;
       case 'reviewed':
@@ -415,12 +417,15 @@ export default function EventWorkflowPage() {
       </div>
 
       <div className="space-y-6">
-        {/* Step 1: Screening Test */}
+        {/* Step 1: Screening Test - hidden when skipped */}
+        {registration.screening_status !== 'skipped' && (
         <Card>
           <CardHeader>              <div className="flex items-center gap-3">
                 {getStatusIcon(registration.screening_status)}
                 <div>
-                  <CardTitle>Step 1: Screening Test</CardTitle>
+                  <CardTitle>
+                    Step 1: Screening Test
+                  </CardTitle>
                   <CardDescription>
                     {getScreeningStatusMessage()}
                   </CardDescription>
@@ -495,10 +500,6 @@ export default function EventWorkflowPage() {
                   <p>✅ Screening test completed successfully!</p>
                 )}
               </div>
-            ) : registration.screening_status === 'skipped' ? (
-              <div className="text-orange-700 bg-orange-50 p-4 rounded-lg">
-                ⏭️ Screening test was skipped by admin.
-              </div>
             ) : (
               <div className="text-gray-600 bg-gray-50 p-4 rounded-lg">
                 Waiting for admin to send the screening test.
@@ -506,6 +507,7 @@ export default function EventWorkflowPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Project Instructions - Show after passing screening or if screening is skipped */}
         {shouldShowStep2() && event.project_instructions && (
@@ -532,16 +534,18 @@ export default function EventWorkflowPage() {
           </Card>
         )}
 
-        {/* Step 2: Presentation Submission - Only show if user passed screening or it was skipped AND start button is enabled */}
-        {shouldShowStep2() && event.show_start_button && (
+  {/* Presentation Submission - Only show if user passed screening or it was skipped AND start button is enabled */}
+  {(() => { 
+    const baseTitle = event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission";
+    const title = registration.screening_status === 'skipped' ? baseTitle : `Step 2: ${baseTitle}`;
+    return (
+  shouldShowStep2() && event.show_start_button && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
                 {getStatusIcon(registration.presentation_status)}
                 <div>
-                  <CardTitle>
-                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
-                  </CardTitle>
+                  <CardTitle>{title}</CardTitle>
                   <CardDescription>
                     Status: {registration.presentation_status.charAt(0).toUpperCase() + registration.presentation_status.slice(1)}
                   </CardDescription>
@@ -656,19 +660,21 @@ export default function EventWorkflowPage() {
                 </Button>
               </form>
             </CardContent>
-          </Card>
-        )}
+    </Card>
+  ) ); })()}
 
-        {/* Step 2 Disabled Message - Show when start button is disabled by admin */}
-        {shouldShowStep2() && !event.show_start_button && (
+  {/* Step 2 Disabled Message - Show when start button is disabled by admin */}
+  {(() => { 
+    const baseTitle = event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission";
+    const title = registration.screening_status === 'skipped' ? baseTitle : `Step 2: ${baseTitle}`;
+    return (
+  shouldShowStep2() && !event.show_start_button && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-orange-600" />
                 <div>
-                  <CardTitle>
-                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
-                  </CardTitle>
+                  <CardTitle>{title}</CardTitle>
                   <CardDescription>
                     Temporarily Disabled
                   </CardDescription>
@@ -689,18 +695,20 @@ export default function EventWorkflowPage() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ) ); })()}
 
-        {/* Step 2 Blocked Message - Show when user failed the test */}
-        {!shouldShowStep2() && registration.screening_status === 'completed' && workflowData.test_result && !workflowData.test_result.passed && (
+  {/* Step 2 Blocked Message - Show when user failed the test */}
+  {(() => { 
+    const baseTitle = event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission";
+    const title = registration.screening_status === 'skipped' ? baseTitle : `Step 2: ${baseTitle}`;
+    return (
+  !shouldShowStep2() && registration.screening_status === 'completed' && workflowData.test_result && !workflowData.test_result.passed && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600" />
                 <div>
-                  <CardTitle>
-                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
-                  </CardTitle>
+                  <CardTitle>{title}</CardTitle>
                   <CardDescription>
                     Access Restricted
                   </CardDescription>
@@ -722,18 +730,20 @@ export default function EventWorkflowPage() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ) ); })()}
 
-        {/* Step 2 Hidden Message - Show when no screening test is assigned */}
-        {!shouldShowStep2() && registration.screening_status === 'pending' && (
+  {/* Step 2 Hidden Message - Show when no screening test is assigned */}
+  {(() => { 
+    const baseTitle = event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission";
+    const title = registration.screening_status === 'skipped' ? baseTitle : `Step 2: ${baseTitle}`;
+    return (
+  !shouldShowStep2() && registration.screening_status === 'pending' && (
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-gray-500" />
                 <div>
-                  <CardTitle>
-                    Step 2: {event.event_category === "sales" ? "Sales Presentation Submission" : "Project Submission"}
-                  </CardTitle>
+                  <CardTitle>{title}</CardTitle>
                   <CardDescription>
                     Waiting for Admin
                   </CardDescription>
@@ -752,7 +762,7 @@ export default function EventWorkflowPage() {
               </div>
             </CardContent>
           </Card>
-        )}
+        ) ); })()}
       </div>{/* Test Instructions Modal */}
       {showInstructions && testData && (
         <TestInstructionsModal
