@@ -162,7 +162,6 @@ export default function EventDetailsPage() {
         }
         
         const eventLoadTime = performance.now();
-        console.log(`Event data loaded in ${Math.round(eventLoadTime - startTime)}ms`);
         
         setLoading(false); // Show event details immediately
 
@@ -204,7 +203,6 @@ export default function EventDetailsPage() {
         setCheckingAuth(false);
         
         const totalTime = performance.now();
-        console.log(`Total page initialization: ${Math.round(totalTime - startTime)}ms`);
 
       } catch (error) {
         console.error("Error loading event and auth:", error);

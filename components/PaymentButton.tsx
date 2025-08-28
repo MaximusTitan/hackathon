@@ -80,7 +80,6 @@ export default function PaymentButton({
               throw new Error("Payment verification failed");
             }
           } catch (error) {
-            console.error("Payment verification error:", error);
             toast.error("Payment verification failed. Please contact support.");
           }
         },
@@ -100,8 +99,7 @@ export default function PaymentButton({
       } else {
         throw new Error("Razorpay SDK not loaded");
       }
-    } catch (error) {
-      console.error("Payment error:", error);
+  } catch (error) {
       toast.error("Failed to initiate payment. Please try again.");
     } finally {
       setProcessing(false);

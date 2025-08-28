@@ -33,9 +33,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
   const [showModal, setShowModal] = useState(false);
 
   // Debug: Log when images state changes
-  useEffect(() => {
-    console.log('Images state updated:', images.length, 'images');
-  }, [images]);
+  useEffect(() => {}, [images]);
 
   // useAuth already provides user; mark auth as checked
 
@@ -46,19 +44,15 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     onError: (error) => {
       console.error('SWR error fetching past images:', error);
     },
-    onSuccess: (data) => {
-      console.log('SWR successfully fetched past images:', data?.images?.length || 0);
-    }
+  onSuccess: (data) => {}
   });
 
   // Sync SWR data with local state when data changes
   useEffect(() => {
-    if (swrData?.images) {
-      console.log('SWR data received:', swrData.images.length, 'images');
+  if (swrData?.images) {
       setImages(swrData.images);
       setLoading(false);
-    } else if (!isLoading) {
-      console.log('No SWR data, setting loading to false');
+  } else if (!isLoading) {
       setLoading(false);
     }
   }, [swrData, isLoading]);
@@ -116,7 +110,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       });
       formData.append('event_id', eventId);
 
-      console.log('Making upload request for user:', currentUser.email);
+      
       
       // Create AbortController for timeout
       const controller = new AbortController();
@@ -131,10 +125,10 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       clearTimeout(timeoutId);
 
       const responseData = await response.json();
-      console.log('Upload response:', response.status, responseData);
+      
 
       if (response.ok) {
-        console.log('Upload successful, response data:', responseData);
+        
         toast.success("Images uploaded successfully!");
         setSelectedFiles([]);
         setCaptions({});
@@ -142,11 +136,9 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
         
         // If API returns the uploaded images, update local state immediately
         if (responseData.images && Array.isArray(responseData.images)) {
-          console.log('Updating local state with', responseData.images.length, 'new images');
+          
           setImages(prev => {
-            const newImages = [...prev, ...responseData.images];
-            console.log('New images array length:', newImages.length);
-            return newImages;
+            return [...prev, ...responseData.images];
           });
         }
         

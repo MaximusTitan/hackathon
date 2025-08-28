@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const file = form.get("logo");
     const eventId = form.get("eventId");
 
-    console.log('Upload logo request - File:', file?.constructor.name, 'EventId:', eventId);
+    
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No logo image provided" }, { status: 400 });
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File size must be less than 2MB" }, { status: 400 });
     }
 
-    console.log('Uploading logo - File size:', file.size, 'Type:', file.type, 'Name:', file.name);
+    
 
     // Generate path and upload to event-images bucket (same as events)
     const ext = file.name.split(".").pop() || "jpg";
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       .from('event-images')
       .getPublicUrl(fileName);
 
-    console.log('Logo uploaded successfully:', publicUrl);
+    
 
     return NextResponse.json({ publicUrl });
   } catch (err: any) {

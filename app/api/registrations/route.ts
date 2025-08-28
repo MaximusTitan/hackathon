@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAndUser } from "@/utils/supabase/require-session";
+import { sendEventRegistrationEmail } from "@/utils/email-service";
 
 export async function POST(request: Request) {
   try {
@@ -57,10 +58,30 @@ export async function POST(request: Request) {
     if (regError) {
       return NextResponse.json({ error: regError.message }, { status: 500 });
     }
-    
-    return NextResponse.json({ success: true });
+
+    // Fetch event details for email
+    const { data: eventData } = await supabase
+      .from('events')
+      .select('id,title,description,start_date,end_date,start_time,end_time,event_type,meeting_link,location,venue_name,address_line1,city,postal_code,is_paid,price')
+      .eq('id', event_id)
+      .single();
+
+    let emailResult: any = null;
+  if (eventData && userData.email) {
+      try {
+        emailResult = await sendEventRegistrationEmail({
+          to: userData.email,
+            userName: userData.name,
+            event: eventData
+        });
+    // email result processed
+      } catch (err) {
+        emailResult = { ok: false, exception: (err as Error).message };
+      }
+    }
+
+  return NextResponse.json({ success: true, emailSent: !!emailResult?.ok, emailSkipped: emailResult?.skipped || false, emailError: (!emailResult?.ok && !emailResult?.skipped) ? (emailResult?.error || emailResult?.exception) : undefined, emailDebug: process.env.NODE_ENV !== 'production' ? emailResult : undefined });
   } catch (error) {
-    console.error("Registration error:", error);
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }

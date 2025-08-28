@@ -28,11 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Shared loader to sync auth/session/profile state
   const loadSession = async () => {
     try {
-      console.log('Loading session...');
       const supabase = createClient();
       setLoading(true);
       const { data: sessRes } = await supabase.auth.getSession();
-      console.log('Session result:', { session: !!sessRes.session, user: !!sessRes.session?.user });
       setSession(sessRes.session ?? null);
       const currentUser = sessRes.session?.user ?? null;
       setUser(currentUser ?? null);
@@ -48,9 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
       }
-      console.log('Session loaded successfully');
-    } catch (error) {
-      console.error('Error loading session:', error);
+  } catch (error) {
       // Reset to safe defaults on error
       setSession(null);
       setUser(null);
@@ -69,7 +65,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, !!session);
       
       // Directly update state from the session parameter
       if (session) {
@@ -103,7 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Force a session check when navigating to home page after login
     if (pathname === '/' || pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin')) {
-      console.log('Important route, forcing session reload:', pathname);
       loadSession();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,7 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Also refresh on window focus (useful after email verification)
   useEffect(() => {
     const handleFocus = () => {
-      console.log('Window focused, refreshing auth...');
       loadSession();
     };
 

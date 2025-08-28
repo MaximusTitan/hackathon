@@ -37,29 +37,28 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log('Past images upload request received');
   const auth = await getSupabaseAndSession();
   if (!auth.ok) {
-    console.log('Auth failed:', auth.res.status, auth.res.statusText);
+    
     return auth.res;
   }
   const { session } = auth;
-  console.log('Auth successful for user:', session.user.email);
+  
   
   try {
     const { id: eventId } = await params;
-    console.log('Processing upload for event:', eventId);
+    
 
     // Ensure admin
     const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.email === 'admin@hackon.com';
     if (!isAdmin) {
-      console.log('User is not admin:', session.user.email);
+      
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const formData = await request.formData();
     const images = formData.getAll('images').filter(f => f instanceof File) as File[];
-    console.log('Found images:', images.length);
+    
     
     if (images.length === 0) {
       return NextResponse.json({ error: 'No images provided' }, { status: 400 });
@@ -69,12 +68,12 @@ export async function POST(
     for (let i = 0; i < images.length; i++) {
       const file = images[i];
       const caption = (formData.get(`caption_${i}`) as string) || null;
-      console.log(`Processing image ${i + 1}/${images.length}:`, file.name, file.size, 'bytes');
+      
       
       const ext = file.name.split('.').pop() || 'jpg';
       const fileName = `${eventId}/${uuidv4()}_${i}.${ext}`;
       
-      console.log('Uploading to storage:', fileName);
+      
       const { error: uploadError } = await supabaseAdmin.storage
         .from('past-event-images')
         .upload(fileName, file, { upsert: false });
@@ -88,7 +87,7 @@ export async function POST(
         .from('past-event-images')
         .getPublicUrl(fileName);
         
-      console.log('Saving to database:', publicUrl);
+      
       const { data, error: dbError } = await supabaseAdmin
         .from('past_event_images')
         .insert({ event_id: eventId, image_url: publicUrl, caption, uploaded_by: session.user.id })
@@ -97,13 +96,13 @@ export async function POST(
         
       if (!dbError && data) {
         uploaded.push(data);
-        console.log('Image uploaded successfully');
+        
       } else {
         console.error('Database error:', dbError?.message);
       }
     }
     
-    console.log(`Upload complete: ${uploaded.length} images uploaded`);
+    
     return NextResponse.json({ message: `${uploaded.length} images uploaded`, images: uploaded });
   } catch (err) {
     console.error('Past images upload failed:', err);

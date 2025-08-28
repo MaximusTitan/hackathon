@@ -68,7 +68,7 @@ export default function HeaderNav() {
 
   // Debug logging in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('HeaderNav Debug:', { user: !!user, role, isAdmin });
+    // debug: user, role, isAdmin
   }
 
   return (

@@ -128,7 +128,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
   // Log for debugging in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('Generated OG Image URL:', ogImageUrl.toString());
+    // generated OG URL: ogImageUrl.toString()
   }
 
   // Determine the primary image to use

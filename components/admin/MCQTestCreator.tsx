@@ -36,7 +36,6 @@ export default function MCQTestCreator({
   isSubmitting,
   mode 
 }: MCQTestCreatorProps) {
-  console.log('MCQTestCreator received existingTest:', existingTest);
   
   const [testData, setTestData] = useState({
     title: existingTest?.title || 'Screening Test',
@@ -46,7 +45,6 @@ export default function MCQTestCreator({
     questions: Array.isArray(existingTest?.questions) ? existingTest.questions : []
   });
 
-  console.log('Initial testData:', testData);
 
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<MCQQuestion | null>(null);
