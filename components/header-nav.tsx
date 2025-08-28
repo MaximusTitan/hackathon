@@ -42,6 +42,8 @@ export default function HeaderNav() {
     // Use server action to sign out so cookies/session are cleared consistently
     try {
       await signOutAction();
+      // Refresh the page to ensure all components update with new auth state
+      window.location.reload();
     } catch {
       router.push("/sign-in");
     }

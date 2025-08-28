@@ -3,6 +3,7 @@ import "./globals.css";
 import HeaderNav from "@/components/header-nav";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/providers/auth-provider";
+import AuthRefreshHandler from "@/components/AuthRefreshHandler";
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.className} light`}>
       <body style={{ backgroundColor: "#F7F1EF", color: "#333" }}>
         <AuthProvider>
+          <AuthRefreshHandler />
           <HeaderNav />
           <main className="min-h-screen flex items-start justify-center">
             {children}

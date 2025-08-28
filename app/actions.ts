@@ -80,6 +80,7 @@ export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const returnUrl = formData.get("returnUrl") as string;
+  const refresh = formData.get("refresh") as string;
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -93,10 +94,15 @@ export const signInAction = async (formData: FormData) => {
 
   // If returnUrl is provided, redirect to that URL instead of the home page
   if (returnUrl) {
-    return redirect(returnUrl);
+    // Add refresh parameter to the return URL if refresh was requested
+    const separator = returnUrl.includes('?') ? '&' : '?';
+    const finalUrl = refresh === 'true' ? `${returnUrl}${separator}refresh=true` : returnUrl;
+    return redirect(finalUrl);
   }
 
-  return redirect("/"); // Redirect to home page after sign-in if no returnUrl
+  // Add refresh parameter to home page if refresh was requested
+  const finalUrl = refresh === 'true' ? '/?refresh=true' : '/';
+  return redirect(finalUrl);
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
@@ -169,7 +175,7 @@ export const resetPasswordAction = async (formData: FormData) => {
 export const signOutAction = async () => {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return redirect("/sign-in");
+  return redirect("/sign-in?refresh=true");
 };
 
 export const signUpAdminAction = async (formData: FormData) => {

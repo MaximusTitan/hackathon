@@ -6,22 +6,25 @@ import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 
 // SignInForm component that uses useSearchParams hook
 function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const message = searchParams.get("message");
   const returnUrl = searchParams.get("returnUrl");
 
-  // Create a custom action that includes the returnUrl
+  // Create a custom action that includes the returnUrl and refresh parameter
   const customSignInAction = async (formData: FormData) => {
     // Append the returnUrl to the form data
     if (returnUrl) {
       formData.append("returnUrl", returnUrl);
     }
+    // Add refresh parameter to trigger page refresh after sign in
+    formData.append("refresh", "true");
     return signInAction(formData);
   };
 
