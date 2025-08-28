@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Upload, X, Camera, Trash2, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/utils/supabase/client";
 import { useAuth } from "@/components/providers/auth-provider";
 import useSWR from "swr";
 
@@ -33,23 +32,36 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
   const [selectedImage, setSelectedImage] = useState<PastEventImage | null>(null);
   const [showModal, setShowModal] = useState(false);
 
+  // Debug: Log when images state changes
   useEffect(() => {
-    fetchPastEventImages();
-  }, [eventId, isAdmin]);
+    console.log('Images state updated:', images.length, 'images');
+  }, [images]);
 
   // useAuth already provides user; mark auth as checked
 
   const fetcher = (url: string) => fetch(url).then(res => res.json());
-  const { data: swrData, isLoading, mutate } = useSWR(`/api/events/${eventId}/past-images`, fetcher, {
+  const { data: swrData, isLoading, mutate, error: swrError } = useSWR(`/api/events/${eventId}/past-images`, fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 60_000,
+    dedupingInterval: 5000, // Reduced from 60s to 5s for better responsiveness
+    onError: (error) => {
+      console.error('SWR error fetching past images:', error);
+    },
+    onSuccess: (data) => {
+      console.log('SWR successfully fetched past images:', data?.images?.length || 0);
+    }
   });
-  const fetchPastEventImages = () => {
-    setLoading(true);
-    // Reflect SWR cached data immediately if present
-    if (swrData?.images) setImages(swrData.images);
-    setLoading(false);
-  };
+
+  // Sync SWR data with local state when data changes
+  useEffect(() => {
+    if (swrData?.images) {
+      console.log('SWR data received:', swrData.images.length, 'images');
+      setImages(swrData.images);
+      setLoading(false);
+    } else if (!isLoading) {
+      console.log('No SWR data, setting loading to false');
+      setLoading(false);
+    }
+  }, [swrData, isLoading]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -73,31 +85,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     });
   };
 
-  // Helper function to get auth headers using session
-  const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    try {
-      const supabase = createClient();
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Session error:', error);
-        return {};
-      }
-      
-      if (session?.access_token) {
-        console.log('Found valid session with access token for user:', session.user?.email);
-        return { 
-          'Authorization': `Bearer ${session.access_token}`
-        };
-      }
-      
-      console.warn('No session or access token found');
-      return {};
-    } catch (error) {
-      console.error('Error getting auth headers:', error);
-      return {};
-    }
-  };
+  // Removed bearer token approach; server routes now use session cookie
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
@@ -128,37 +116,56 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
       });
       formData.append('event_id', eventId);
 
-  const authHeaders = await getAuthHeaders();
-
-      if (!authHeaders['Authorization']) {
-        toast.error("Authentication failed. Please log in again.");
-        return;
-      }
-
       console.log('Making upload request for user:', currentUser.email);
+      
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch(`/api/events/${eventId}/past-images`, {
         method: 'POST',
-        headers: authHeaders,
         body: formData,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       const responseData = await response.json();
       console.log('Upload response:', response.status, responseData);
 
       if (response.ok) {
+        console.log('Upload successful, response data:', responseData);
         toast.success("Images uploaded successfully!");
         setSelectedFiles([]);
         setCaptions({});
         setShowUploadForm(false);
-  await mutate();
+        
+        // If API returns the uploaded images, update local state immediately
+        if (responseData.images && Array.isArray(responseData.images)) {
+          console.log('Updating local state with', responseData.images.length, 'new images');
+          setImages(prev => {
+            const newImages = [...prev, ...responseData.images];
+            console.log('New images array length:', newImages.length);
+            return newImages;
+          });
+        }
+        
+        // Refresh data from server to ensure consistency
+        mutate();
       } else {
         console.error('Upload error response:', responseData);
         toast.error(responseData.error || "Failed to upload images");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Failed to upload images");
+      
+      if (error instanceof Error && error.name === 'AbortError') {
+        toast.error("Upload timed out. Please try again.");
+      } else {
+        toast.error("Failed to upload images");
+      }
     } finally {
+      // Always reset uploading state
       setUploading(false);
     }
   };
@@ -172,21 +179,16 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     }
 
     try {
-  const authHeaders = await getAuthHeaders();
-      
-      if (!authHeaders['Authorization']) {
-        toast.error("Authentication failed. Please log in again.");
-        return;
-      }
-
       const response = await fetch(`/api/events/${eventId}/past-images/${imageId}`, {
         method: 'DELETE',
-        headers: authHeaders,
       });
 
       if (response.ok) {
-  toast.success("Image deleted successfully");
-  await mutate();
+        toast.success("Image deleted successfully");
+        // Immediately remove from local state
+        setImages(prev => prev.filter(img => img.id !== imageId));
+        // Refresh data from server to ensure consistency
+        mutate();
       } else {
         const error = await response.json();
         console.error('Delete error response:', error);
@@ -224,7 +226,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showModal, selectedImage]);
+  }, [showModal, selectedImage, images]);
 
   const navigateImage = (direction: 'prev' | 'next') => {
     if (!selectedImage) return;
@@ -241,7 +243,7 @@ export default function PastEventGallery({ eventId, isAdmin = false }: PastEvent
     setSelectedImage(images[newIndex]);
   };
 
-  if (loading) {
+  if (isLoading || loading) {
     return (
       <div className="mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">

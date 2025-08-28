@@ -8,8 +8,7 @@ type Props = {
 };
 
 async function getEvent(eventParam: string) {
-  // Next.js v15 requires awaiting cookies() when consuming its values.
-  // createServerComponentClient accepts the cookies function directly and handles it.
+  // Provide cookies accessor lazily (Next.js 15 requirement is to not synchronously read values before await points)
   const supabase = createServerComponentClient({ cookies });
   
   try {
@@ -39,8 +38,8 @@ async function getEvent(eventParam: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const resolvedParams = await params;
-  const event = await getEvent(resolvedParams.id);
+  const { id } = await params;
+  const event = await getEvent(id);
   
   if (!event) {
     return {

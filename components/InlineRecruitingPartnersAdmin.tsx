@@ -38,7 +38,6 @@ export default function InlineRecruitingPartnersAdmin({
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [addForm, setAddForm] = useState({
     name: '',
-    logo_url: '',
     website_url: ''
   });
   const [adding, setAdding] = useState(false);
@@ -88,30 +87,28 @@ export default function InlineRecruitingPartnersAdmin({
       const reader = new FileReader();
       reader.onload = (e) => {
         setLogoPreview(e.target?.result as string);
-        setAddForm(prev => ({ ...prev, logo_url: '' }));
       };
       reader.readAsDataURL(file);
     }
   };
 
   const uploadLogo = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = fileName;
+    const formData = new FormData();
+    formData.append('logo', file);
+    formData.append('eventId', eventId);
 
-    const { error: uploadError } = await supabase.storage
-      .from('recruiting-logos')
-      .upload(filePath, file);
+    const res = await fetch('/api/admin/recruiting-partners/upload-logo', {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (uploadError) {
-      throw new Error(`Upload failed: ${uploadError.message}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(error.error || `Upload failed (${res.status})`);
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('recruiting-logos')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+    const data = await res.json();
+    return data.publicUrl;
   };
 
   const handleAdd = async () => {
@@ -120,19 +117,26 @@ export default function InlineRecruitingPartnersAdmin({
       return;
     }
 
-    if (!logoFile && !addForm.logo_url.trim()) {
-      toast.error('Please either upload a logo file or provide a logo URL');
+    if (!logoFile) {
+      toast.error('Please upload a logo file');
       return;
     }
 
     setAdding(true);
     try {
-      let logoUrl = addForm.logo_url;
+      let logoUrl = '';
 
       if (logoFile) {
         setUploading(true);
-        logoUrl = await uploadLogo(logoFile);
-        setUploading(false);
+        try {
+          logoUrl = await uploadLogo(logoFile);
+        } catch (uploadError: any) {
+          console.error('Logo upload failed:', uploadError);
+          toast.error(uploadError.message || 'Failed to upload logo. Please try again.');
+          return;
+        } finally {
+          setUploading(false);
+        }
       }
 
       const res = await fetch('/api/admin/recruiting-partners', {
@@ -165,7 +169,7 @@ export default function InlineRecruitingPartnersAdmin({
   };
 
   const resetForm = () => {
-    setAddForm({ name: '', logo_url: '', website_url: '' });
+    setAddForm({ name: '', website_url: '' });
     setLogoFile(null);
     setLogoPreview(null);
   };
@@ -313,29 +317,6 @@ export default function InlineRecruitingPartnersAdmin({
                     )}
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 border-t border-gray-300"></div>
-                  <span className="text-xs text-gray-500 bg-white px-2">OR</span>
-                  <div className="flex-1 border-t border-gray-300"></div>
-                </div>
-                
-                <div>
-                  <Label htmlFor="logo_url" className="text-sm text-gray-600">Logo URL</Label>
-                  <Input
-                    id="logo_url"
-                    value={addForm.logo_url}
-                    onChange={(e) => {
-                      setAddForm(prev => ({ ...prev, logo_url: e.target.value }));
-                      if (e.target.value.trim()) {
-                        setLogoFile(null);
-                        setLogoPreview(null);
-                      }
-                    }}
-                    placeholder="https://example.com/logo.png"
-                    disabled={!!logoFile}
-                  />
-                </div>
               </div>
             </div>
             
@@ -349,12 +330,12 @@ export default function InlineRecruitingPartnersAdmin({
               />
             </div>
             
-            {(logoPreview || addForm.logo_url) && (
+            {logoPreview && (
               <div className="mt-4">
                 <Label>Logo Preview</Label>
                 <div className="mt-2 p-3 bg-gray-50 rounded-lg border flex items-center justify-center min-h-[80px]">
                   <Image
-                    src={logoPreview || addForm.logo_url}
+                    src={logoPreview}
                     alt="Logo preview"
                     width={120}
                     height={48}

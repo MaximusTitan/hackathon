@@ -1,14 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAndSession } from "@/utils/supabase/require-session";
+import { v4 as uuidv4 } from "uuid";
 
-// Create a service role client for server-side operations
+// Service role client for privileged storage ops
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
-// Create a regular client for auth operations
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function GET(
   request: NextRequest,
@@ -39,84 +37,76 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log('Past images upload request received');
+  const auth = await getSupabaseAndSession();
+  if (!auth.ok) {
+    console.log('Auth failed:', auth.res.status, auth.res.statusText);
+    return auth.res;
+  }
+  const { session } = auth;
+  console.log('Auth successful for user:', session.user.email);
+  
   try {
     const { id: eventId } = await params;
+    console.log('Processing upload for event:', eventId);
 
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized - No token provided' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    // Verify the JWT token
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return NextResponse.json({ error: 'Unauthorized - Invalid token' }, { status: 401 });
-    }
-
-    // Check admin role
-    const isAdmin = user.user_metadata?.role === 'admin' || user.email === 'admin@hackon.com';
+    // Ensure admin
+    const isAdmin = session.user.user_metadata?.role === 'admin' || session.user.email === 'admin@hackon.com';
     if (!isAdmin) {
+      console.log('User is not admin:', session.user.email);
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const formData = await request.formData();
-    const images = formData.getAll('images') as File[];
+    const images = formData.getAll('images').filter(f => f instanceof File) as File[];
+    console.log('Found images:', images.length);
     
     if (images.length === 0) {
       return NextResponse.json({ error: 'No images provided' }, { status: 400 });
     }
 
-    const uploadedImages = [];
-
+    const uploaded: any[] = [];
     for (let i = 0; i < images.length; i++) {
-      const image = images[i];
-      const caption = formData.get(`caption_${i}`) as string;
+      const file = images[i];
+      const caption = (formData.get(`caption_${i}`) as string) || null;
+      console.log(`Processing image ${i + 1}/${images.length}:`, file.name, file.size, 'bytes');
       
-      // Upload image to Supabase Storage
-      const fileExt = image.name.split('.').pop();
-      const fileName = `${eventId}/${Date.now()}_${i}.${fileExt}`;
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${eventId}/${uuidv4()}_${i}.${ext}`;
       
-      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      console.log('Uploading to storage:', fileName);
+      const { error: uploadError } = await supabaseAdmin.storage
         .from('past-event-images')
-        .upload(fileName, image);
-
+        .upload(fileName, file, { upsert: false });
+        
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        console.error('Storage upload error:', uploadError.message);
         continue;
       }
-
-      // Get public URL
+      
       const { data: { publicUrl } } = supabaseAdmin.storage
         .from('past-event-images')
         .getPublicUrl(fileName);
-
-      // Save to database
-      const { data: dbData, error: dbError } = await supabaseAdmin
+        
+      console.log('Saving to database:', publicUrl);
+      const { data, error: dbError } = await supabaseAdmin
         .from('past_event_images')
-        .insert({
-          event_id: eventId,
-          image_url: publicUrl,
-          caption: caption || null,
-          uploaded_by: user.id,
-        })
+        .insert({ event_id: eventId, image_url: publicUrl, caption, uploaded_by: session.user.id })
         .select()
         .single();
-
-      if (!dbError && dbData) {
-        uploadedImages.push(dbData);
+        
+      if (!dbError && data) {
+        uploaded.push(data);
+        console.log('Image uploaded successfully');
+      } else {
+        console.error('Database error:', dbError?.message);
       }
     }
-
-    return NextResponse.json({ 
-      message: `${uploadedImages.length} images uploaded successfully`,
-      images: uploadedImages 
-    });
-  } catch (error) {
-    console.error('Error:', error);
+    
+    console.log(`Upload complete: ${uploaded.length} images uploaded`);
+    return NextResponse.json({ message: `${uploaded.length} images uploaded`, images: uploaded });
+  } catch (err) {
+    console.error('Past images upload failed:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
